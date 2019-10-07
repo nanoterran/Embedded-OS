@@ -1,7 +1,7 @@
 TARGET = Wave
 CC = gcc
 
-OBJS = Wave.o
+OBJS += Wave.o
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET)
