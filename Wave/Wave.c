@@ -12,35 +12,35 @@ enum
 
 void set_mode(int want_key)
 {
-  static struct termios old, new;
+  static struct termios oldTerminalInterface, newTerminalInterface;
 
   if (!want_key) {
-    tcsetattr(STDIN_FILENO, TCSANOW, &old);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminalInterface);
     return;
   }
 
-  tcgetattr(STDIN_FILENO, &old);
-  new = old;
-  new.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &new);
+  tcgetattr(STDIN_FILENO, &oldTerminalInterface);
+  newTerminalInterface = oldTerminalInterface;
+  newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
 }
 
 int get_key()
 {
-	int c = 0;
-	struct timeval tv;
-	fd_set fs;
-	tv.tv_usec = tv.tv_sec = 0;
- 
-	FD_ZERO(&fs);
-	FD_SET(STDIN_FILENO, &fs);
-	select(STDIN_FILENO + 1, &fs, 0, 0, &tv);
- 
-	if (FD_ISSET(STDIN_FILENO, &fs)) {
-		c = getchar();
-		set_mode(0);
-	}
-	return c;
+  int keyValue = 0;
+  struct timeval timeValue;
+  fd_set fileDescriptorSet;
+  timeValue.tv_usec = timeValue.tv_sec = 0;
+
+  FD_ZERO(&fileDescriptorSet);
+  FD_SET(STDIN_FILENO, &fileDescriptorSet);
+  select(STDIN_FILENO + 1, &fileDescriptorSet, 0, 0, &timeValue);
+
+  if (FD_ISSET(STDIN_FILENO, &fileDescriptorSet)) {
+    keyValue = getchar();
+    set_mode(0);
+  }
+  return keyValue;
 }
 
 int main(int argc, char *argv[])
@@ -51,18 +51,19 @@ int main(int argc, char *argv[])
     printf("[!] Usage: %s <output file> <number of samples>\n", argv[0]);
     return 1;
   }
-  int c;
+
+  int keyValue;
   char *outputFilename = argv[1];
   int numberOfSamples = atoi(argv[2]);
-
   FILE *outputFile = fopen(outputFilename, "a");
 
-  printf("Writing to file...\n");
+  printf("Processing...\n");
+
   while(numberOfSamples > 0)
   {
     set_mode(1);
 
-    if(!(c = get_key()))
+    if(!(keyValue = get_key()))
     {
       fprintf(outputFile, "0\n");
     }
@@ -76,6 +77,7 @@ int main(int argc, char *argv[])
   }
 
   fclose(outputFile);
+  printf("Done Processing %c\n", outputFilename);
 
   return 0;
 }
