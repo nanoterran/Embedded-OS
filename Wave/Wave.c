@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -77,7 +78,7 @@ int main(int argc, char *argv[])
   }
 
   fclose(outputFile);
-  printf("Done Processing %c\n", outputFilename);
+  printf("Done Processing %s\n", outputFilename);
 
   return 0;
 }
