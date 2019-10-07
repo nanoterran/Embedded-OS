@@ -12,16 +12,17 @@ enum
 
 void set_mode(int want_key)
 {
-	static struct termios old, new;
-	if (!want_key) {
-		tcsetattr(STDIN_FILENO, TCSANOW, &old);
-		return;
-	}
- 
-	tcgetattr(STDIN_FILENO, &old);
-	new = old;
-	new.c_lflag &= ~(ICANON | ECHO);
-	tcsetattr(STDIN_FILENO, TCSANOW, &new);
+  static struct termios old, new;
+
+  if (!want_key) {
+    tcsetattr(STDIN_FILENO, TCSANOW, &old);
+    return;
+  }
+
+  tcgetattr(STDIN_FILENO, &old);
+  new = old;
+  new.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &new);
 }
 
 int get_key()
@@ -44,17 +45,6 @@ int get_key()
 
 int main(int argc, char *argv[])
 {
-
-	// while(1) {
-	// 	set_mode(1);
-	// 	while (!(c = get_key()))
-  //   {
-  //     printf("0\n");
-  //     usleep(10000);
-  //   }
-	// 	printf("key %d\n", c);
-	// }
-
   if(argc < RequiredNumberOfArguments)
   {
     printf("[-] ERROR: Insufficient number of arguments.");
@@ -75,13 +65,12 @@ int main(int argc, char *argv[])
     if(!(c = get_key()))
     {
       fprintf(outputFile, "0\n");
-      // numberOfSamples--;
-      // usleep(1000);
     }
     else
     {
       fprintf(outputFile, "1\n");
     }
+
     numberOfSamples--;
     usleep(DelayTimeInMicroSec);
   }
