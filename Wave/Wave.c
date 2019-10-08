@@ -8,7 +8,7 @@
 enum
 {
   RequiredNumberOfArguments = 3,
-  DelayTimeInMicroSec = 1000000
+  DelayTimeInSeconds = 1
 };
 
 void set_mode(int want_key)
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
   int keyValue;
   char *outputFilename = argv[1];
   int numberOfSamples = atoi(argv[2]);
-  FILE *outputFile = fopen(outputFilename, "a");
+  FILE *outputFile = fopen(outputFilename, "w");
 
   printf("Processing...\n");
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     }
 
     numberOfSamples--;
-    usleep(DelayTimeInMicroSec);
+    sleep(DelayTimeInSeconds);
   }
 
   fclose(outputFile);
