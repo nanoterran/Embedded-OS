@@ -58,6 +58,11 @@ int main(int argc, char *argv[])
   int numberOfSamples = atoi(argv[2]);
   FILE *outputFile = fopen(outputFilename, "w");
 
+  if(outputFilename == NULL)
+  {
+    printf("[-] ERROR: Could not open %s", outputFilename);
+    return 1;
+  }
   printf("Processing...\n");
 
   while(numberOfSamples > 0)
