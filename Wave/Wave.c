@@ -29,13 +29,13 @@ void set_mode(int want_key)
 int get_key()
 {
   int keyValue = 0;
-  struct timeval timeValue;
+  struct timeval timeout;
   fd_set fileDescriptorSet;
-  timeValue.tv_usec = timeValue.tv_sec = 0;
+  timeout.tv_usec = timeout.tv_sec = 0;
 
   FD_ZERO(&fileDescriptorSet);
   FD_SET(STDIN_FILENO, &fileDescriptorSet);
-  select(STDIN_FILENO + 1, &fileDescriptorSet, 0, 0, &timeValue);
+  select(STDIN_FILENO + 1, &fileDescriptorSet, 0, 0, &timeout);
 
   if (FD_ISSET(STDIN_FILENO, &fileDescriptorSet)) {
     keyValue = getchar();
