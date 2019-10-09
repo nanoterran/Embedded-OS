@@ -12,6 +12,7 @@ enum
 };
 
 static struct termios newTerminalInterface, oldTerminalInterface;
+static fd_set fileDescriptorSet;
 
 void disable_raw_mode()
 {
@@ -22,14 +23,13 @@ void enable_raw_mode()
 {
   tcgetattr(STDIN_FILENO, &oldTerminalInterface);
   newTerminalInterface = oldTerminalInterface;
-  newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
+  cfmakeraw(&newTerminalInterface);
   tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
 }
 
 int input_available()
 {
   struct timeval timeout;
-  static fd_set fileDescriptorSet;
   timeout.tv_usec = timeout.tv_sec = 0;
 
   FD_ZERO(&fileDescriptorSet);
@@ -37,6 +37,11 @@ int input_available()
   select(STDIN_FILENO + 1, &fileDescriptorSet, 0, 0, &timeout);
 
   return FD_ISSET(STDIN_FILENO, &fileDescriptorSet);
+}
+
+void discard_data()
+{
+  tcflush(STDIN_FILENO, TCIFLUSH);
 }
 
 int main(int argc, char *argv[])
@@ -58,25 +63,24 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  printf("Processing...\n");
+  enable_raw_mode();
 
   while(numberOfSamples > 0)
   {
     if(input_available())
     {
-      getchar();
-      disable_raw_mode();
+      discard_data();
       fprintf(outputFile, "1\n");
     }
     else
     {
-      enable_raw_mode();
       fprintf(outputFile, "0\n");
     }
 
     numberOfSamples--;
     sleep(DelayTimeInSeconds);
   }
+
   disable_raw_mode();
 
   fclose(outputFile);
