@@ -11,37 +11,33 @@ enum
   DelayTimeInSeconds = 1
 };
 
-void set_mode(int want_key)
+static struct termios newTerminalInterface, oldTerminalInterface;
+
+void disable_raw_mode()
 {
-  static struct termios oldTerminalInterface, newTerminalInterface;
-
-  if (!want_key) {
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminalInterface);
-    return;
-  }
-
-  tcgetattr(STDIN_FILENO, &oldTerminalInterface);
-  newTerminalInterface = oldTerminalInterface;
-  newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTerminalInterface);
 }
 
-int get_key()
+void enable_raw_mode()
 {
-  int keyValue = 0;
+  tcgetattr(STDIN_FILENO, &oldTerminalInterface);
+  
+  newTerminalInterface = oldTerminalInterface;
+  newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &newTerminalInterface);
+}
+
+int input_available()
+{
   struct timeval timeout;
-  fd_set fileDescriptorSet;
+  static fd_set fileDescriptorSet;
   timeout.tv_usec = timeout.tv_sec = 0;
 
   FD_ZERO(&fileDescriptorSet);
   FD_SET(STDIN_FILENO, &fileDescriptorSet);
   select(STDIN_FILENO + 1, &fileDescriptorSet, 0, 0, &timeout);
 
-  if (FD_ISSET(STDIN_FILENO, &fileDescriptorSet)) {
-    keyValue = getchar();
-    set_mode(0);
-  }
-  return keyValue;
+  return FD_ISSET(STDIN_FILENO, &fileDescriptorSet);
 }
 
 int main(int argc, char *argv[])
@@ -53,7 +49,6 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  int keyValue;
   char *outputFilename = argv[1];
   int numberOfSamples = atoi(argv[2]);
   FILE *outputFile = fopen(outputFilename, "w");
@@ -63,24 +58,27 @@ int main(int argc, char *argv[])
     printf("[-] ERROR: Could not open %s", outputFilename);
     return 1;
   }
+
   printf("Processing...\n");
 
   while(numberOfSamples > 0)
   {
-    set_mode(1);
-
-    if(!(keyValue = get_key()))
+    if(input_available())
     {
-      fprintf(outputFile, "0\n");
+      getchar();
+      disable_raw_mode();
+      fprintf(outputFile, "1\n");
     }
     else
     {
-      fprintf(outputFile, "1\n");
+      enable_raw_mode();
+      fprintf(outputFile, "0\n");
     }
 
     numberOfSamples--;
     sleep(DelayTimeInSeconds);
   }
+  disable_raw_mode();
 
   fclose(outputFile);
   printf("Done Processing %s\n", outputFilename);
