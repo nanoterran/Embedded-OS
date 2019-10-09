@@ -21,7 +21,6 @@ void disable_raw_mode()
 void enable_raw_mode()
 {
   tcgetattr(STDIN_FILENO, &oldTerminalInterface);
-  
   newTerminalInterface = oldTerminalInterface;
   newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
