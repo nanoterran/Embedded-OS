@@ -15,7 +15,7 @@ static struct termios newTerminalInterface, oldTerminalInterface;
 
 void disable_raw_mode()
 {
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTerminalInterface);
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminalInterface);
 }
 
 void enable_raw_mode()
@@ -24,7 +24,7 @@ void enable_raw_mode()
   
   newTerminalInterface = oldTerminalInterface;
   newTerminalInterface.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &newTerminalInterface);
+  tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
 }
 
 int input_available()
