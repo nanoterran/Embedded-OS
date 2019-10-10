@@ -27,7 +27,7 @@ void enable_raw_mode()
   tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
 }
 
-int input_available()
+int key_pressed()
 {
   struct timeval timeout;
   timeout.tv_usec = timeout.tv_sec = 0;
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
   while(numberOfSamples > 0)
   {
-    if(input_available())
+    if(key_pressed())
     {
       discard_data();
       fprintf(outputFile, "1\n");
