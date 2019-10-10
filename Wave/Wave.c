@@ -14,11 +14,19 @@ enum
 static struct termios newTerminalInterface, oldTerminalInterface;
 static fd_set fileDescriptorSet;
 
+/**
+ * Sets the terminal back into canonical mode.
+ */ 
 void disable_raw_mode()
 {
   tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminalInterface);
 }
 
+/**
+ * Enables raw mode on the terminal so that input is available
+ * character by character. Disables echoing and all processing
+ * of terminal input characters.
+ */
 void enable_raw_mode()
 {
   tcgetattr(STDIN_FILENO, &oldTerminalInterface);
@@ -27,6 +35,10 @@ void enable_raw_mode()
   tcsetattr(STDIN_FILENO, TCSANOW, &newTerminalInterface);
 }
 
+/**
+ * Checks if a key has been pressed by watching stdin to see
+ * when input becomes available.
+ */
 int key_pressed()
 {
   struct timeval timeout;
@@ -39,6 +51,9 @@ int key_pressed()
   return FD_ISSET(STDIN_FILENO, &fileDescriptorSet);
 }
 
+/**
+ * Discards any data by clearing the stdin buffer.
+ */
 void discard_data()
 {
   tcflush(STDIN_FILENO, TCIFLUSH);
