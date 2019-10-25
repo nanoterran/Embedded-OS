@@ -24,7 +24,7 @@ SOURCE = $(wildcard *.c)
 OBJS = $(SOURCE:%=$(BUILD_DIR)/%.o)
 
 # Dependencies
-DEP := $(OBJs:.o=.d) 
+DEP := $(OBJS:.o=.d) 
 
 # Compiler and Linker Flags
 CFLAGS += -Wall -c
@@ -35,7 +35,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(OBJS) $(LFLAGS) -o $(TARGET)
 
 # Compiles
-$(BUILD_DIR)/%.c.o: $(SOURCE)
+$(BUILD_DIR)/%.c.o: %.c
 	$(MKDIR_P) $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
