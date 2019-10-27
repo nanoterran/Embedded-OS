@@ -2,10 +2,13 @@
 
 void process_word(char *word)
 {
-	for(int i = 0; i < strlen(word); i++)
+	int i;
+	for(i = 0; i < strlen(word); i++)
 	{
-		char *mcode_letter = mcodestring(5);
-		process_mcode_letter(mcode_letter);
+		int ascii = (int)word[i];
+		char *mcode_letter = mcodestring(ascii);
+		printf("%s\n", mcode_letter);
+		// process_mcode_letter(mcode_letter);
 		usleep(100000);
 	}
 }
