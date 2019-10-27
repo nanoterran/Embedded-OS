@@ -1,4 +1,5 @@
 #define CQ_DEFAULT	0
+#include "McodeMod.h"
 
 /* the empty string, follwed by 26 letter codes, followed by the 10 numeral codes, followed by the comma,
    period, and question mark.  */
@@ -8,7 +9,6 @@ char *morse_code[40] = {"",
 ".-..","--","-.","---",".--.","--.-",".-.","...","-","..-","...-",
 ".--","-..-","-.--","--..","-----",".----","..---","...--","....-",
 ".....","-....","--...","---..","----.","--..--","-.-.-.","..--.."};
-
 
 inline char * mcodestring(int asciicode)
 {
