@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-	u_int8_t MaxNumberOfArguments = 3;
+	int MaxNumberOfArguments = 3;
 
 	if(argc < MaxNumberOfArguments)
 	{
@@ -13,6 +13,7 @@ int main(int argc, char *argv[])
 	}
 	char *raw_word = argv[2];
 	process_word(raw_word);
+	printf("\n");
 
 	return 0;
 }

@@ -27,8 +27,8 @@ OBJS = $(SOURCE:%=$(BUILD_DIR)/%.o)
 DEP := $(OBJS:.o=.d) 
 
 # Compiler and Linker Flags
-CFLAGS += -Wall -c -ggdb -std=gnu89
-LFLAGS += -Wall
+CFLAGS += -Wall -c -ggdb
+LFLAGS += -Wall -ggdb
 
 # Links all the object files
 $(TARGET): $(OBJS)
