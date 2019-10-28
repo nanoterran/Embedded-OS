@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "Utils.h"
 
 int main(int argc, char *argv[])
@@ -12,8 +11,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	char *raw_word = argv[2];
-	process_word(raw_word);
-	printf("\n");
+
+	FILE *command_fd = popen("uname -m", "r");
+	if (command_fd == NULL) {
+    printf("Failed to run command\n" );
+    exit(1);
+  }
+
+	char architecture[10];
+
+	/* Read the output a line at a time - output it. */
+  fgets(architecture, sizeof(architecture), command_fd);
+	fclose(command_fd);
+	process_word(raw_word, architecture);
 
 	return 0;
 }
