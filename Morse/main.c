@@ -11,7 +11,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	char architecture[10];
 	mcode_configuration_t *configuration = malloc(sizeof(configuration));
 
 	// Find the word on the argument options
@@ -24,6 +23,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Gets the architecture of the system
+	char architecture[10];
 	FILE *command_fd = popen("uname -m", "r");
 	if (command_fd == NULL) {
     printf("Failed to run command\n" );
