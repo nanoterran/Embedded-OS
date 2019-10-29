@@ -9,14 +9,19 @@
 
 enum
 {
-  DotTimeInMicroSec =              500000,
-  DashTimeInMicroSec =             1500000,
-  BetweenCharacterTimeInMicroSec = 250000,
-  BetweenLetterTimeInMicroSec =    2000000
+  DotTimeInMicroSec               = 500000,
+  DashTimeInMicroSec              = 1500000,
+  BetweenCharacterTimeInMicroSec  = 250000,
+  BetweenLetterTimeInMicroSec     = 2000000
 };
 
-void x86_64_process_mcode(char *word);
-void arm_process_mcode(char *word);
-void process_word(char *word, char *architecture);
+typedef struct mcode_configuration_t
+{
+  char *architecture;
+  FILE *file_descriptor;
+  char *raw_word;
+} mcode_configuration_t;
+
+void process_word(mcode_configuration_t *configuration);
 
 #endif
