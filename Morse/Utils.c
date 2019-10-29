@@ -1,77 +1,67 @@
 #include "Utils.h"
 
-void process_word(char *word, char *architecture)
+/*
+ * Process a word depending on the system architecture. If running
+ * on x86_64 it will print the Morse Code to the terminal, and
+ * if running on the BeagleBone Black it will flash LED3
+ */
+void process_word(mcode_configuration_t *configuration)
 {
-	if(!strcmp(architecture, "x86_64\n"))
-	{
-		x86_64_process_mcode(word);
-	}
-	else if(!strcmp(architecture, "armv7l\n"))
-	{
-		arm_process_mcode(word);
-	}
-}
+	FILE *file_descriptor = configuration->file_descriptor;
+	char *word = configuration->raw_word;
 
-void arm_process_mcode(char *word)
-{
-	const char *LEDBrightness = "/sys/class/leds/beaglebone:green:usr3/brightness";
-	FILE *file_descriptor = fopen(LEDBrightness, "r+");
-
+	// Process the entire word character by character
 	for(int i = 0; i < strlen(word); i++)
 	{
 		int ascii_code = (int)word[i];
 		char *mcode_letter = (char *)mcodestring(ascii_code);
-		
+
+		// Represents each character in Morse Code
 		for(int i = 0; i < strlen(mcode_letter); i++)
 		{
 			if(mcode_letter[i] == '.')
 			{
-				fprintf(file_descriptor, "1");
+				if(!strcmp(configuration->architecture, "x86_64\n"))
+				{
+					fprintf(file_descriptor, "Dot ");
+				}
+				else if(!strcmp(configuration->architecture, "armv7l\n"))
+				{
+					fprintf(file_descriptor, "1");
+				}
+				
 				fflush(file_descriptor);
 				usleep(DotTimeInMicroSec);
 			}
 			else if(mcode_letter[i] == '-')
 			{
-				fprintf(file_descriptor, "1");
+				if(!strcmp(configuration->architecture, "x86_64\n"))
+				{
+					fprintf(file_descriptor, "Dash ");
+				}
+				else if(!strcmp(configuration->architecture, "armv7l\n"))
+				{
+					fprintf(file_descriptor, "1");
+				}
+
 				fflush(file_descriptor);
 				usleep(DashTimeInMicroSec);
 			}
-			fprintf(file_descriptor, "0");
+
+			if(!strcmp(configuration->architecture, "armv7l\n"))
+			{
+				fprintf(file_descriptor, "0");
+			}
+			
 			fflush(file_descriptor);
 			usleep(BetweenCharacterTimeInMicroSec);
 		}
-		usleep(BetweenLetterTimeInMicroSec);
-	}
 
-	fclose(file_descriptor);
-}
-
-void x86_64_process_mcode(char *word)
-{
-	for(int i = 0; i < strlen(word); i++)
-	{
-		int ascii_code = (int)word[i];
-		char *mcode_letter = (char *)mcodestring(ascii_code);
-		
-		for(int i = 0; i < strlen(mcode_letter); i++)
+		if(!strcmp(configuration->architecture, "x86_64\n"))
 		{
-			if(mcode_letter[i] == '.')
-			{
-				fprintf(stdout, "Dot ");
-				fflush(stdout);
-				usleep(DotTimeInMicroSec);
-			}
-			else if(mcode_letter[i] == '-')
-			{
-				fprintf(stdout, "Dash ");
-				fflush(stdout);
-				usleep(DashTimeInMicroSec);
-			}
-
-			usleep(BetweenCharacterTimeInMicroSec);
+			fprintf(file_descriptor, "\n");
 		}
 
-		fprintf(stdout, "\t");
 		usleep(BetweenLetterTimeInMicroSec);
 	}
 }
