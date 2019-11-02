@@ -23,7 +23,6 @@ static int __init find_task_init(void) {
   for_each_process(current_task) {
     if(!strcmp(name, current_task->comm))
     {
-      // printk(KERN_WARNING "Found process %s with pid %d", current_task->comm, current_task->pid);
       pid = current_task->pid;
       found = 1;
     }
