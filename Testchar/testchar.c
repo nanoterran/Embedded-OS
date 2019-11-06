@@ -117,7 +117,7 @@ static void __exit testchar_exit(void){
   device_destroy(testcharClass, MKDEV(majorNumber, 0));     // remove the device
   class_unregister(testcharClass);                          // unregister the device class
   class_destroy(testcharClass);                             // remove the device class
-  unregister_chrdev(majorNumber, DEVICE_NAME);             // unregister the major number
+  unregister_chrdev(majorNumber, DEVICE_NAME);              // unregister the major number
 
   printk(KERN_INFO "TestChar: Goodbye from the LKM!\n");
 }
