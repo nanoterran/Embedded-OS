@@ -14,20 +14,25 @@ int main(void)
 
   printf("Starting device test code example...\n");
 
-  // Open the device with read/write access
+  // Open the device driver with read/write access
   file_descriptor = open("/dev/testchar", O_RDWR);
-  if (file_descriptor < 0){
+  if(file_descriptor < 0)
+  {
     perror("Failed to open the device...");
     return errno;
   }
 
   printf("Type in a short string to send to the kernel module:\n");
-  scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
+
+  // Read in a string (with spaces), changes delimeter to new line.
+  scanf("%[^\n]%*c", stringToSend);
+
   printf("Writing message to the device [%s].\n", stringToSend);
 
-  // Send the string to the LKM
+  // Send the string to the Loadable Kernel Module
   ret = write(file_descriptor, stringToSend, strlen(stringToSend));
-  if (ret < 0){
+  if(ret < 0)
+  {
     perror("Failed to write the message to the device.");
 
     return errno;
