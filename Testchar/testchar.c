@@ -32,7 +32,7 @@ static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
  *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
  */
-static struct file_operations fops = {
+static struct file_operations file_operations_t = {
   .open = dev_open,
   .read = dev_read,
   .write = dev_write,
@@ -43,7 +43,7 @@ static int __init testchar_init(void){
   printk(KERN_INFO "TestChar: Initializing the TestChar LKM\n");
 
   // Try to dynamically allocate a major number for the device -- more difficult but worth it
-  majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
+  majorNumber = register_chrdev(0, DEVICE_NAME, &file_operations_t);
   if(majorNumber < 0)
   {
     printk(KERN_ALERT "TestChar failed to register a major number\n");
@@ -79,6 +79,38 @@ static int __init testchar_init(void){
   printk(KERN_INFO "TestChar: device class created correctly\n");
 
   return 0;
+}
+
+/**
+ * Allows users to open the device driver
+ */
+static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
+{
+
+}
+
+/**
+ * Allows users to close the device driver.
+ */
+static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
+{
+
+}
+
+/**
+ * Allows the device driver to send data to user programs.
+ */
+static ssize_t dev_read(struct file *file_ptr, char *data, size_t data_size, loff_t *offset_ptr)
+{
+
+}
+
+/**
+ * Allows user programs to write data to the device driver.
+ */
+static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_size, loff_t *offset_ptr)
+{
+
 }
 
 static void __exit testchar_exit(void){
