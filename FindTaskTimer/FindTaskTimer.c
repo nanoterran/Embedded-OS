@@ -17,7 +17,13 @@ MODULE_PARM_DESC(name, "The name of the process to find");
 
 static struct timer_list timer;
 
-static void find_task_callback(struct timer_list *another_timer)
+/**
+ * Looks for the given task name once the timer expires. This function needs
+ * an argument of type struct timer_list because of the new timer_setup function
+ * pointer.
+ * @the_timer - this argument is needed for timer_setup
+ */
+static void find_task_callback(struct timer_list *the_timer)
 {
   struct task_struct *current_task;
   int found = 0;
@@ -33,22 +39,24 @@ static void find_task_callback(struct timer_list *another_timer)
   }
 
   if(found)
+  {
     printk("Found process %s with pid %d\n", name, pid);
+  }
   else
+  {
     printk("Not Found process %s\n", name);
 
-  // // timers are one-shot, so we have to set-up the next timer event:
-  // timer.expires += HZ; // add another delay period
-  // add_timer(&timer);
+    // We need to setup the timer again
+    timer.expires += HZ; // add another delay period
+    add_timer(&timer);
+  }
 }
 
 static int __init find_task_init(void) {
-  // Intializes a timer
-  // init_timers(&timer);
+  // Set th timer to expire in one second
+  timer.expires = jiffies + HZ;
 
-  timer.expires = jiffies + HZ;   // expire in one second
-
-  // Sets up a timer
+  // Sets up a one shot timer
   timer_setup(&timer, &find_task_callback, 0);
 
   // Registers the timer
@@ -58,6 +66,7 @@ static int __init find_task_init(void) {
 
   return 0;
 }
+
 static void __exit find_task_exit(void) {
   // Delete the registered timer to give resources back to kernel
   del_timer(&timer);
