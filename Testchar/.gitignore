@@ -5,3 +5,4 @@
 *.order
 *.symvers
 .tmp_versions/*
+tester
