@@ -37,4 +37,19 @@ int main(void)
 
     return errno;
   }
+
+  printf("Press ENTER to read back from the device...\n");
+  getchar();
+  printf("Reading from the device...\n");
+  
+  ret = read(file_descriptor, receive, BUFFER_LENGTH);
+  if(ret < 0)
+  {
+    perror("Failed to read the message from the device.");
+    return errno;
+  }
+  printf("The received message is: [%s]\n", receive);
+  printf("End of the program\n");
+
+  return 0;
 }
