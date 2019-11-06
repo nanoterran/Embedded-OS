@@ -18,10 +18,10 @@ MODULE_PARM_DESC(name, "The name of the process to find");
 static struct timer_list timer;
 
 /**
- * Looks for the given task name once the timer expires. This function needs
- * an argument of type struct timer_list because of the new timer_setup function
- * pointer.
- * @the_timer - this argument is needed for timer_setup
+ * find_task_callback - Looks for the given task name once the timer expires.
+ * This function needs an argument of type struct timer_list because of the
+ * new timer_setup function pointer.
+ * @the_timer: this argument is needed for timer_setup
  */
 static void find_task_callback(struct timer_list *the_timer)
 {
