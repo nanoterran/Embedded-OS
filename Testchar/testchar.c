@@ -28,18 +28,17 @@ static int     dev_open(struct inode *, struct file *);
 static int     dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
-static int     dev_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
+static int     dev_ioctl(struct file *, unsigned int, unsigned long);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
  *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
  */
 static struct file_operations file_operations_t = {
-  .open = dev_open,
-  .read = dev_read,
-  .write = dev_write,
-  .release = dev_release,
-  .ioctl = dev_ioctl
+  .open =    dev_open,
+  .read =    dev_read,
+  .write =   dev_write,
+  .release = dev_release
 };
 
 static int __init testchar_init(void){
@@ -101,9 +100,7 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
-  printk(KERN_INFO "TestChar: Driver have been closed\n");
-
-  number_of_opens--;
+  printk(KERN_INFO "TestChar: Device successfully closed\n");
 
   return 0;   // Sucessfully released
 }
@@ -151,9 +148,14 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
   }
   size_of_message = strlen(message);
 
-  printk(KERN_INFO "TestChar: Received %zu characters from the user\n", size_of_message);
+  printk(KERN_INFO "TestChar: Received %u characters from the user\n", size_of_message);
 
   return data_size;
+}
+
+static int dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
+{
+  return 0;
 }
 
 static void __exit testchar_exit(void){
