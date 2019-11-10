@@ -111,20 +111,26 @@ static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 /**
  * Allows the device driver to send data to user programs.
  */
-static ssize_t dev_read(struct file *file_ptr, char *data, size_t data_size, loff_t *offset_ptr)
+static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_size, loff_t *offset_ptr)
 {
   int error_number = 0;
-   // copy_to_user has the format ( * to, *from, size) and returns 0 on success
-   error_number = copy_to_user(buffer, message, size_of_message);
- 
-   if (error_number==0){            // if true then have success
-      printk(KERN_INFO "EBBChar: Sent %d characters to the user\n", size_of_message);
-      return (size_of_message=0);  // clear the position to the start and return 0
-   }
-   else {
-      printk(KERN_INFO "EBBChar: Failed to send %d characters to the user\n", error_number);
-      return -EFAULT;              // Failed -- return a bad address message (i.e. -14)
-   }
+
+  // copy_to_user has the format ( * to, *from, size) and returns 0 on success
+  error_number = copy_to_user(user_buffer, message, size_of_message);
+
+  // if true then have success
+  if(error_number == 0)
+  {
+    printk(KERN_INFO "TestChar: Sent %d characters to the user\n", size_of_message);
+
+    size_of_message = 0;
+    return 0;
+  }
+  else
+  {
+    printk(KERN_INFO "TestChar: Could not send %d characters to the user\n", error_number);
+    return -EFAULT;
+  }
 }
 
 /**
@@ -142,16 +148,18 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
     printk(KERN_INFO "TestChar: Data could not be writen\n");
     return -EFAULT;
   }
-  printk(KERN_INFO "TestChar: Data writen to device driver\n");
+  size_of_message = strlen(message);
+
+  printk(KERN_INFO "TestChar: Received %zu characters from the user\n", size_of_message);
 
   return data_size;
 }
 
 static void __exit testchar_exit(void){
   device_destroy(testchar_class, MKDEV(major_number, 0));     // remove the device
-  class_unregister(testchar_class);                          // unregister the device class
-  class_destroy(testchar_class);                             // remove the device class
-  unregister_chrdev(major_number, DEVICE_NAME);              // unregister the major number
+  class_unregister(testchar_class);                           // unregister the device class
+  class_destroy(testchar_class);                              // remove the device class
+  unregister_chrdev(major_number, DEVICE_NAME);               // unregister the major number
 
   printk(KERN_INFO "TestChar: Goodbye from the LKM!\n");
 }
