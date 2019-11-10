@@ -148,6 +148,8 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
     return -EFAULT;
   }
   size_of_message = strlen(message);
+  
+  sprintf(message, "(%lu letters)", data_size);
 
   printk(KERN_INFO "TestChar: Received %u characters from the user\n", size_of_message);
 
