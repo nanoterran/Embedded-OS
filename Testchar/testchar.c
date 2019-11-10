@@ -166,3 +166,6 @@ static void __exit testchar_exit(void){
 
   printk(KERN_INFO "TestChar: Goodbye from the LKM!\n");
 }
+
+module_init(testchar_init);
+module_exit(testchar_exit);
