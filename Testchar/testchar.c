@@ -115,7 +115,7 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
 {
   int error_number = 0;
 
-  // copy_to_user has the format ( * to, *from, size) and returns 0 on success
+  // copy_to_user has the format ( * to, * from, size) and returns 0 on success
   error_number = copy_to_user(user_buffer, message, size_of_message);
 
   // if true then have success
@@ -143,7 +143,8 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
     return 0;
   }
 
-  if(copy_from_user(&message, data, data_size))
+  // copy_from_user has the format ( * to, * from, size) and returns 0 on success
+  if(copy_from_user(message, data, data_size))
   {
     printk(KERN_INFO "TestChar: Data could not be writen\n");
     return -EFAULT;
