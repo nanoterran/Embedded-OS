@@ -21,7 +21,7 @@ static short  size_of_message;               ///< Used to remember the size of t
 static int    number_of_opens = 0;           ///< Counts the number of times the device is opened
 
 static struct class  *testchar_class = NULL;   ///< The device-driver class struct pointer
-static struct device *testchar_device = NULL; ///< The device-driver device struct pointer
+static struct device *testchar_device = NULL;  ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
 static int     dev_open(struct inode *, struct file *);
@@ -41,7 +41,8 @@ static struct file_operations file_operations_t = {
   .release = dev_release
 };
 
-static int __init testchar_init(void){
+static int __init testchar_init(void)
+{
   printk(KERN_INFO "TestChar: Initializing the TestChar LKM\n");
 
   // Try to dynamically allocate a major number for the device -- more difficult but worth it
@@ -158,7 +159,8 @@ static int dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long 
   return 0;
 }
 
-static void __exit testchar_exit(void){
+static void __exit testchar_exit(void)
+{
   device_destroy(testchar_class, MKDEV(major_number, 0));     // remove the device
   class_unregister(testchar_class);                           // unregister the device class
   class_destroy(testchar_class);                              // remove the device class
