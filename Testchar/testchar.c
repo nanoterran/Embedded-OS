@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <asm/uaccess.h>
 #include <linux/uaccess.h>
 
 #define DEVICE_NAME "testchar"
@@ -14,19 +15,20 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A simple Linux char driver");
 MODULE_VERSION("0.1");
 
-static int    majorNumber;                   ///< Stores the device number -- determined automatically
+static int    major_number;                  ///< Stores the device number -- determined automatically
 static char   message[256] = {0};            ///< Memory for the string that is passed from userspace
 static short  size_of_message;               ///< Used to remember the size of the string stored
-static int    numberOpens = 0;               ///< Counts the number of times the device is opened
+static int    number_of_opens = 0;           ///< Counts the number of times the device is opened
 
-static struct class *testcharClass = NULL;   ///< The device-driver class struct pointer
-static struct device *testcharDevice = NULL; ///< The device-driver device struct pointer
+static struct class  *testchar_class = NULL;   ///< The device-driver class struct pointer
+static struct device *testchar_device = NULL; ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
 static int     dev_open(struct inode *, struct file *);
 static int     dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
+static int     dev_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -37,44 +39,45 @@ static struct file_operations file_operations_t = {
   .read = dev_read,
   .write = dev_write,
   .release = dev_release,
+  .ioctl = dev_ioctl
 };
 
 static int __init testchar_init(void){
   printk(KERN_INFO "TestChar: Initializing the TestChar LKM\n");
 
   // Try to dynamically allocate a major number for the device -- more difficult but worth it
-  majorNumber = register_chrdev(0, DEVICE_NAME, &file_operations_t);
-  if(majorNumber < 0)
+  major_number = register_chrdev(0, DEVICE_NAME, &file_operations_t);
+  if(major_number < 0)
   {
     printk(KERN_ALERT "TestChar failed to register a major number\n");
 
-    return majorNumber;
+    return major_number;
   }
-  printk(KERN_INFO "TestChar: registered correctly with major number %d\n", majorNumber);
+  printk(KERN_INFO "TestChar: registered correctly with major number %d\n", major_number);
 
   // Register the device class
-  testcharClass = class_create(THIS_MODULE, CLASS_NAME);
-  if(IS_ERR(testcharClass))
+  testchar_class = class_create(THIS_MODULE, CLASS_NAME);
+  if(IS_ERR(testchar_class))
   {
-    unregister_chrdev(majorNumber, DEVICE_NAME);
+    unregister_chrdev(major_number, DEVICE_NAME);
 
     printk(KERN_ALERT "Failed to register device class\n");
 
-    return PTR_ERR(testcharClass);
+    return PTR_ERR(testchar_class);
   }
   printk(KERN_INFO "TestChar: device class registered correctly\n");
 
   // Register the device driver
-  testcharDevice = device_create(testcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-  if (IS_ERR(testcharDevice))
+  testchar_device = device_create(testchar_class, NULL, MKDEV(major_number, 0), NULL, DEVICE_NAME);
+  if (IS_ERR(testchar_device))
   {
     // Repeated code but the alternative is goto statements
-    class_destroy(testcharClass);
-    unregister_chrdev(majorNumber, DEVICE_NAME);
+    class_destroy(testchar_class);
+    unregister_chrdev(major_number, DEVICE_NAME);
 
     printk(KERN_ALERT "Failed to create the device\n");
 
-    return PTR_ERR(testcharDevice);
+    return PTR_ERR(testchar_device);
   }
   printk(KERN_INFO "TestChar: device class created correctly\n");
 
@@ -86,7 +89,11 @@ static int __init testchar_init(void){
  */
 static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 {
+  printk(KERN_INFO "TestChar: Driver have been opened\n");
 
+  number_of_opens++;
+
+  return 0;   // Successfully opened
 }
 
 /**
@@ -94,7 +101,11 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
+  printk(KERN_INFO "TestChar: Driver have been closed\n");
 
+  number_of_opens--;
+
+  return 0;   // Sucessfully released
 }
 
 /**
@@ -102,7 +113,18 @@ static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
  */
 static ssize_t dev_read(struct file *file_ptr, char *data, size_t data_size, loff_t *offset_ptr)
 {
-
+  int error_number = 0;
+   // copy_to_user has the format ( * to, *from, size) and returns 0 on success
+   error_number = copy_to_user(buffer, message, size_of_message);
+ 
+   if (error_number==0){            // if true then have success
+      printk(KERN_INFO "EBBChar: Sent %d characters to the user\n", size_of_message);
+      return (size_of_message=0);  // clear the position to the start and return 0
+   }
+   else {
+      printk(KERN_INFO "EBBChar: Failed to send %d characters to the user\n", error_number);
+      return -EFAULT;              // Failed -- return a bad address message (i.e. -14)
+   }
 }
 
 /**
@@ -110,14 +132,26 @@ static ssize_t dev_read(struct file *file_ptr, char *data, size_t data_size, lof
  */
 static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_size, loff_t *offset_ptr)
 {
+  if(data_size <= 0)
+  {
+    return 0;
+  }
 
+  if(copy_from_user(&message, data, data_size))
+  {
+    printk(KERN_INFO "TestChar: Data could not be writen\n");
+    return -EFAULT;
+  }
+  printk(KERN_INFO "TestChar: Data writen to device driver\n");
+
+  return data_size;
 }
 
 static void __exit testchar_exit(void){
-  device_destroy(testcharClass, MKDEV(majorNumber, 0));     // remove the device
-  class_unregister(testcharClass);                          // unregister the device class
-  class_destroy(testcharClass);                             // remove the device class
-  unregister_chrdev(majorNumber, DEVICE_NAME);              // unregister the major number
+  device_destroy(testchar_class, MKDEV(major_number, 0));     // remove the device
+  class_unregister(testchar_class);                          // unregister the device class
+  class_destroy(testchar_class);                             // remove the device class
+  unregister_chrdev(major_number, DEVICE_NAME);              // unregister the major number
 
   printk(KERN_INFO "TestChar: Goodbye from the LKM!\n");
 }
