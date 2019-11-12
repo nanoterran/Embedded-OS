@@ -164,8 +164,10 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
       printk(KERN_INFO "TestChar: Mode Changed to ALLCAPS\n");
       break;
     default:
+      printk(KERN_INFO "TestChar: No command received\n");
       return -ENOTTY; 
   }
+
   return 0;
 }
 
