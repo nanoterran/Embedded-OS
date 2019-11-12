@@ -1,8 +1,10 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<errno.h>
-#include<fcntl.h>
-#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include "commands.h"
 
 #define BUFFER_LENGTH 256               ///< The buffer length (crude but fine)
 static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
@@ -34,7 +36,13 @@ int main(void)
   if(ret < 0)
   {
     perror("Failed to write the message to the device.");
+    return errno;
+  }
 
+  ret = ioctl(file_descriptor, TESTCHAR_ALLCAPS);
+  if(ret < 0)
+  {
+    perror("Failed to write the message to the device.");
     return errno;
   }
 
