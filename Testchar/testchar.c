@@ -6,6 +6,7 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/uaccess.h>
+#include "commands.h"
 
 #define DEVICE_NAME "testchar"
 #define CLASS_NAME  "test"
@@ -15,10 +16,11 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A simple Linux char driver");
 MODULE_VERSION("0.1");
 
-static int    major_number;                  ///< Stores the device number -- determined automatically
-static char   message[256] = {0};            ///< Memory for the string that is passed from userspace
-static short  size_of_message;               ///< Used to remember the size of the string stored
-static int    number_of_opens = 0;           ///< Counts the number of times the device is opened
+static int   major_number;                  ///< Stores the device number -- determined automatically
+static char  message[256] = {0};            ///< Memory for the string that is passed from userspace
+static short size_of_message;               ///< Used to remember the size of the string stored
+static int   number_of_opens = 0;           ///< Counts the number of times the device is opened
+static int   device_mode = TESTCHAR_NONE;
 
 static struct class  *testchar_class = NULL;   ///< The device-driver class struct pointer
 static struct device *testchar_device = NULL;  ///< The device-driver device struct pointer
@@ -151,6 +153,19 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
 {
+  switch(command)
+  {
+    case TESTCHAR_NONE:
+      device_mode = TESTCHAR_NONE;
+      printk(KERN_INFO "TestChar: Mode Changed to None\n");
+      break;
+    case TESTCHAR_ALLCAPS:
+      device_mode = TESTCHAR_ALLCAPS;
+      printk(KERN_INFO "TestChar: Mode Changed to ALLCAPS\n");
+      break;
+    default:
+      return -ENOTTY; 
+  }
   return 0;
 }
 
