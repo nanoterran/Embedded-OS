@@ -117,13 +117,14 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
 {
   int error_number = 0;
 
-  char *modified_message[256] = {0};
+  char modified_message[256] = {0};
 
   if(device_mode == TESTCHAR_ALLLOWER)
   {
-    for(int i = 0; i < size_of_message; i++)
+    int i;
+    for(i = 0; i < size_of_message; i++)
     {
-      modified_message[i] = tolower(message[i])
+      modified_message[i] = tolower(message[i]);
     }
     printk(KERN_INFO "TestChar: Message changed to ALLLOWER\n");
   }
