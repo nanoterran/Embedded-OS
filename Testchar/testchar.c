@@ -7,6 +7,7 @@
 #include <asm/uaccess.h>
 #include <linux/uaccess.h>
 #include "commands.h"
+#include <linux/ctype.h>
 
 #define DEVICE_NAME "testchar"
 #define CLASS_NAME  "test"
@@ -116,8 +117,19 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
 {
   int error_number = 0;
 
+  char *modified_message[256] = {0};
+
+  if(device_mode == TESTCHAR_ALLLOWER)
+  {
+    for(int i = 0; i < size_of_message; i++)
+    {
+      modified_message[i] = tolower(message[i])
+    }
+    printk(KERN_INFO "TestChar: Message changed to ALLLOWER\n");
+  }
+
   // copy_to_user has the format ( * to, * from, size) and returns 0 on success
-  error_number = copy_to_user(user_buffer, message, size_of_message);
+  error_number = copy_to_user(user_buffer, modified_message, size_of_message);
 
   // if true then have success
   if(error_number == 0)
@@ -162,6 +174,10 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
     case TESTCHAR_ALLCAPS:
       device_mode = TESTCHAR_ALLCAPS;
       printk(KERN_INFO "TestChar: Mode Changed to ALLCAPS\n");
+      break;
+    case TESTCHAR_ALLLOWER:
+      device_mode = TESTCHAR_ALLLOWER;
+      printk(KERN_INFO "TestChar: Mode Changed to ALLLOWER\n");
       break;
     default:
       printk(KERN_INFO "TestChar: No command received\n");
