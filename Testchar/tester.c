@@ -62,7 +62,7 @@ int main(void)
     printf("3 - Set message to all caps\n");
     printf("4 - keep original message format\n");
     printf("Enter a ioctl command: ");
-    scanf("%d", &command);
+    scanf("%d%*c", &command);
 
     ret = ioctl(file_descriptor, commands_lookup_table[command]);
     if(ret < 0)
@@ -71,6 +71,7 @@ int main(void)
       return errno;
     }
 
+    printf("\n");
     printf("Press ENTER to read back from the device...\n");
     getchar();
     printf("Reading from the device...\n");
@@ -86,7 +87,7 @@ int main(void)
     printf("Send message to driver? [Y/n] ");
     scanf("%[^\n]%*c", &choice);
   }
-  
+
   printf("End of the program\n");
 
   return 0;
