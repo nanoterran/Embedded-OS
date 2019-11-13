@@ -14,6 +14,15 @@ int main(void)
   int ret, file_descriptor;
   char stringToSend[BUFFER_LENGTH];
 
+  unsigned int commands_lookup_table[] =
+    {
+      TESTCHAR_IOCRESET,
+      TESTCHAR_ALLLOWER,
+      TESTCHAR_ALLUPPER,
+      TESTCHAR_ALLCAPS,
+      TESTCHAR_NONE
+    };
+
   printf("Starting device test code example...\n");
 
   // Open the device driver with read/write access
@@ -24,39 +33,60 @@ int main(void)
     return errno;
   }
 
-  printf("Type in a short string to send to the kernel module:\n");
+  char choice;
 
-  // Read in a string (with spaces), changes delimeter to new line.
-  scanf("%[^\n]%*c", stringToSend);
+  printf("Send message to driver? [Y/n] ");
+  scanf("%c", &choice);
 
-  printf("Writing message to the device [%s].\n", stringToSend);
-
-  // Send the string to the Loadable Kernel Module
-  ret = write(file_descriptor, stringToSend, strlen(stringToSend));
-  if(ret < 0)
+  while(choice == 'Y')
   {
-    perror("Failed to write the message to the device.");
-    return errno;
-  }
+    printf("Type in a short string to send to the kernel module:\n");
 
-  ret = ioctl(file_descriptor, TESTCHAR_ALLCAPS);
-  if(ret < 0)
-  {
-    perror("Failed to write the message to the device.");
-    return errno;
-  }
+    // Read in a string (with spaces), changes delimeter to new line.
+    scanf("%[^\n]%*c", stringToSend);
 
-  printf("Press ENTER to read back from the device...\n");
-  getchar();
-  printf("Reading from the device...\n");
+    printf("Writing message to the device [%s].\n", stringToSend);
+
+    // Send the string to the Loadable Kernel Module
+    ret = write(file_descriptor, stringToSend, strlen(stringToSend));
+    if(ret < 0)
+    {
+      perror("Failed to write the message to the device.");
+      return errno;
+    }
+
+    int command = 4;
+
+    printf("1 - Set message to all lowercase");
+    printf("2 - Set message to all uppercase");
+    printf("3 - Set message to all caps");
+    printf("4 - keep original message format");
+    printf("Enter a ioctl command: ");
+    scanf("%d", &command);
+
+    ret = ioctl(file_descriptor, commands_lookup_table[command]);
+    if(ret < 0)
+    {
+      perror("Failed to write the message to the device.");
+      return errno;
+    }
+
+    printf("Press ENTER to read back from the device...\n");
+    getchar();
+    printf("Reading from the device...\n");
+    
+    ret = read(file_descriptor, receive, BUFFER_LENGTH);
+    if(ret < 0)
+    {
+      perror("Failed to read the message from the device.");
+      return errno;
+    }
+    printf("The received message is: [%s]\n\n", receive);
+
+    printf("Send message to driver? [Y/n] ");
+    scanf("%c", &choice);
+  }
   
-  ret = read(file_descriptor, receive, BUFFER_LENGTH);
-  if(ret < 0)
-  {
-    perror("Failed to read the message from the device.");
-    return errno;
-  }
-  printf("The received message is: [%s]\n", receive);
   printf("End of the program\n");
 
   return 0;
