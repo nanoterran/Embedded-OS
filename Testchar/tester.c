@@ -36,7 +36,7 @@ int main(void)
   char choice;
 
   printf("Send message to driver? [Y/n] ");
-  scanf("%c", &choice);
+  scanf("%[^\n]%*c", &choice);
 
   while(choice == 'Y')
   {
@@ -45,7 +45,7 @@ int main(void)
     // Read in a string (with spaces), changes delimeter to new line.
     scanf("%[^\n]%*c", stringToSend);
 
-    printf("Writing message to the device [%s].\n", stringToSend);
+    printf("Writing message to the device [%s].\n\n", stringToSend);
 
     // Send the string to the Loadable Kernel Module
     ret = write(file_descriptor, stringToSend, strlen(stringToSend));
@@ -57,12 +57,13 @@ int main(void)
 
     int command = 4;
 
-    printf("1 - Set message to all lowercase");
-    printf("2 - Set message to all uppercase");
-    printf("3 - Set message to all caps");
-    printf("4 - keep original message format");
+    printf("1 - Set message to all lowercase\n");
+    printf("2 - Set message to all uppercase\n");
+    printf("3 - Set message to all caps\n");
+    printf("4 - keep original message format\n");
     printf("Enter a ioctl command: ");
     scanf("%d", &command);
+    fflush(stdin);
 
     ret = ioctl(file_descriptor, commands_lookup_table[command]);
     if(ret < 0)
@@ -84,7 +85,7 @@ int main(void)
     printf("The received message is: [%s]\n\n", receive);
 
     printf("Send message to driver? [Y/n] ");
-    scanf("%c", &choice);
+    scanf("%[^\n]%*c", &choice);
   }
   
   printf("End of the program\n");
