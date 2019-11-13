@@ -139,16 +139,28 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
   }
   else if(device_mode == TESTCHAR_ALLCAPS)
   {
-    int i;
+    int i = 0;
+    modified_message[i] = toupper(message[i]);
+
     for(i = 1; i < size_of_message; i++)
     {
       if(message[i - 1] == ' ')
+      {
         modified_message[i] = toupper(message[i]);
+      }
+      else
+      {
+        modified_message[i] = message[i];
+      }
     }
-    modified_message[0] = toupper(message[0]);
 
     printk(KERN_INFO "TestChar: Message changed to ALLCAPS\n");
   }
+  else
+  {
+    sprintf(modified_message, "%s(%u letters)", message, size_of_message);
+  }
+  
 
   // copy_to_user has the format ( * to, * from, size) and returns 0 on success
   error_number = copy_to_user(user_buffer, modified_message, size_of_message);
@@ -158,7 +170,6 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
   {
     printk(KERN_INFO "TestChar: Sent %d characters to the user\n", size_of_message);
 
-    // size_of_message = 0;
     return 0;
   }
   else
