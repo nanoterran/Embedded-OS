@@ -201,6 +201,10 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
       device_mode = TESTCHAR_ALLLOWER;
       printk(KERN_INFO "TestChar: Mode Changed to ALLLOWER\n");
       break;
+    case TESTCHAR_ALLUPPER:
+      device_mode = TESTCHAR_ALLUPPER;
+      printk(KERN_INFO "TestChar: Mode Changed to ALLUPPER\n");
+      break;
     default:
       printk(KERN_INFO "TestChar: No command received\n");
       return -ENOTTY; 
