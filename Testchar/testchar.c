@@ -182,22 +182,33 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
 
   if(device_mode == TESTCHAR_ALLLOWER)
   {
-    convert_to_lower(message, modified_message, size_of_message);
+    
   }
   else if(device_mode == TESTCHAR_ALLUPPER)
   {
-    convert_to_upper(message, modified_message, size_of_message);
+    
   }
   else if(device_mode == TESTCHAR_ALLCAPS)
   {
-    convert_to_caps(message, modified_message, size_of_message);
+    
   }
 
-  if(device_mode == TESTCHAR_NONE)
+  switch(device_mode)
   {
-    sprintf(modified_message, "%s(%u letters)", message, size_of_message);
+    case TESTCHAR_NONE:
+      sprintf(modified_message, "%s(%u letters)", message, size_of_message);
+      break;
+    case TESTCHAR_ALLCAPS:
+      convert_to_caps(message, modified_message, size_of_message);
+      break;
+    case TESTCHAR_ALLLOWER:
+      convert_to_lower(message, modified_message, size_of_message);
+      break;
+    case TESTCHAR_ALLUPPER:
+      convert_to_upper(message, modified_message, size_of_message);
+      break;
   }
-  else
+  if(device_mode != TESTCHAR_NONE)
   {
     sprintf(modified_message, "%s(%u letters)", modified_message, size_of_message);
   }
