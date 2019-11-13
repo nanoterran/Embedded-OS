@@ -177,12 +177,12 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
     sprintf(modified_message, "%s(%u letters)", message, size_of_message);
   }
   else
-  {  
+  {
     sprintf(modified_message, "%s(%u letters)", modified_message, size_of_message);
   }
 
   // copy_to_user has the format ( * to, * from, size) and returns 0 on success
-  error_number = copy_to_user(user_buffer, modified_message, size_of_message);
+  error_number = copy_to_user(user_buffer, modified_message, strlen(modified_message));
 
   // if true then have success
   if(error_number == 0)
