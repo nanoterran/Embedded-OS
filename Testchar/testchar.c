@@ -8,14 +8,22 @@
 #include <linux/uaccess.h>
 #include "commands.h"
 #include <linux/ctype.h>
+#include <linux/mutex.h>
 
 #define DEVICE_NAME "testchar"
 #define CLASS_NAME  "test"
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("A simple Linux char driver");
-MODULE_VERSION("0.1");
+MODULE_DESCRIPTION("A character device driver");
+MODULE_VERSION("1.0");
+
+/**
+ * A macro that is used to declare a new mutex that is visible in this file
+ * results in a semaphore variable ebbchar_mutex with value 1 (unlocked)
+ * DEFINE_MUTEX_LOCKED() results in a variable with value 0 (locked)
+ */
+static DEFINE_MUTEX(testchar_mutex);
 
 static int   major_number;                  ///< Stores the device number -- determined automatically
 static char  message[256] = {0};            ///< Memory for the string that is passed from userspace
@@ -85,6 +93,8 @@ static int __init testchar_init(void)
   }
   printk(KERN_INFO "TestChar: device class created correctly\n");
 
+  mutex_init(&ebbchar_mutex);       /// Initialize the mutex lock dynamically at runtime
+
   return 0;
 }
 
@@ -93,6 +103,15 @@ static int __init testchar_init(void)
  */
 static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 {
+  /**
+   * Try to acquire the mutex (i.e., put the lock on/down)
+   * returns 1 if successful and 0 if there is contention
+   */
+  if(!mutex_trylock(&testchar_mutex)){
+    printk(KERN_ALERT "TestChar: Device in use by another process\n");
+
+    return -EBUSY;
+  }
   printk(KERN_INFO "TestChar: Driver have been opened\n");
 
   number_of_opens++;
@@ -105,6 +124,8 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
+  mutex_unlock(&testchar_mutex);          /// Releases the mutex (i.e., the lock goes up)
+
   printk(KERN_INFO "TestChar: Device successfully closed\n");
 
   return 0;   // Sucessfully released
@@ -244,10 +265,11 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
 
 static void __exit testchar_exit(void)
 {
-  device_destroy(testchar_class, MKDEV(major_number, 0));     // remove the device
-  class_unregister(testchar_class);                           // unregister the device class
-  class_destroy(testchar_class);                              // remove the device class
-  unregister_chrdev(major_number, DEVICE_NAME);               // unregister the major number
+  device_destroy(testchar_class, MKDEV(major_number, 0)); // remove the device
+  class_unregister(testchar_class);                       // unregister the device class
+  class_destroy(testchar_class);                          // remove the device class
+  unregister_chrdev(major_number, DEVICE_NAME);           // unregister the major number
+  mutex_destroy(&testchar_mutex);                          // destroy the dynamically-allocated mutex
 
   printk(KERN_INFO "TestChar: Goodbye from the Device Driver!\n");
 }
