@@ -31,7 +31,7 @@ static int     dev_open(struct inode *, struct file *);
 static int     dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
-static long     dev_ioctl(struct file *, unsigned int, unsigned long);
+static long    dev_ioctl(struct file *, unsigned int, unsigned long);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -110,6 +110,46 @@ static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
   return 0;   // Sucessfully released
 }
 
+static void convert_to_lower(char *original, char *modified, short size)
+{
+  int i;
+  for(i = 0; i < size; i++)
+  {
+    modified[i] = tolower(original[i]);
+  }
+  printk(KERN_INFO "TestChar: Message changed to ALLLOWER\n");
+}
+
+static void convert_to_upper(char *original, char *modified, short size)
+{
+  int i;
+  for(i = 0; i < size; i++)
+  {
+    modified[i] = toupper(original[i]);
+  }
+  printk(KERN_INFO "TestChar: Message changed to ALLUPER\n");
+}
+
+static void convert_to_caps(char *original, char *modified, short size)
+{
+  int i = 0;
+  modified[i] = toupper(original[i]);
+
+  for(i = 1; i < size; i++)
+  {
+    if(original[i - 1] == ' ')
+    {
+      modified[i] = toupper(original[i]);
+    }
+    else
+    {
+      modified[i] = original[i];
+    }
+  }
+
+  printk(KERN_INFO "TestChar: Message changed to ALLCAPS\n");
+}
+
 /**
  * Allows the device driver to send data to user programs.
  */
@@ -121,46 +161,25 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
 
   if(device_mode == TESTCHAR_ALLLOWER)
   {
-    int i;
-    for(i = 0; i < size_of_message; i++)
-    {
-      modified_message[i] = tolower(message[i]);
-    }
-    printk(KERN_INFO "TestChar: Message changed to ALLLOWER\n");
+    convert_to_lower(message, modified_message, size_of_message);
   }
   else if(device_mode == TESTCHAR_ALLUPPER)
   {
-    int i;
-    for(i = 0; i < size_of_message; i++)
-    {
-      modified_message[i] = toupper(message[i]);
-    }
-    printk(KERN_INFO "TestChar: Message changed to ALLUPER\n");
+    convert_to_upper(message, modified_message, size_of_message);
   }
   else if(device_mode == TESTCHAR_ALLCAPS)
   {
-    int i = 0;
-    modified_message[i] = toupper(message[i]);
-
-    for(i = 1; i < size_of_message; i++)
-    {
-      if(message[i - 1] == ' ')
-      {
-        modified_message[i] = toupper(message[i]);
-      }
-      else
-      {
-        modified_message[i] = message[i];
-      }
-    }
-
-    printk(KERN_INFO "TestChar: Message changed to ALLCAPS\n");
+    convert_to_caps(message, modified_message, size_of_message);
   }
-  else
+
+  if(device_mode == TESTCHAR_NONE)
   {
     sprintf(modified_message, "%s(%u letters)", message, size_of_message);
   }
-  
+  else
+  {  
+    sprintf(modified_message, "%s(%u letters)", modified_message, size_of_message);
+  }
 
   // copy_to_user has the format ( * to, * from, size) and returns 0 on success
   error_number = copy_to_user(user_buffer, modified_message, size_of_message);
@@ -169,7 +188,6 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
   if(error_number == 0)
   {
     printk(KERN_INFO "TestChar: Sent %d characters to the user\n", size_of_message);
-
     return 0;
   }
   else
@@ -190,7 +208,7 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
   }
   printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
 
-  sprintf(message, "%s(%lu letters)", data, data_size);
+  sprintf(message, "%s", data);
   size_of_message = strlen(message);
 
   return data_size;
