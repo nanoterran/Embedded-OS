@@ -63,7 +63,6 @@ int main(void)
     printf("4 - keep original message format\n");
     printf("Enter a ioctl command: ");
     scanf("%d", &command);
-    fflush(stdin);
 
     ret = ioctl(file_descriptor, commands_lookup_table[command]);
     if(ret < 0)
