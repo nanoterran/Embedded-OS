@@ -7,12 +7,11 @@
 #include "commands.h"
 
 #define BUFFER_LENGTH 256               ///< The buffer length (crude but fine)
-static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
 
 int main(void)
 {
   int ret, file_descriptor;
-  char stringToSend[BUFFER_LENGTH];
+  char choice;
 
   unsigned int commands_lookup_table[] =
     {
@@ -33,13 +32,15 @@ int main(void)
     return errno;
   }
 
-  char choice;
-
   printf("Send message to driver? [Y/n] ");
   scanf("%[^\n]%*c", &choice);
 
   while(choice == 'Y')
   {
+    char receive[BUFFER_LENGTH];
+    char stringToSend[BUFFER_LENGTH];
+    int command = 4;
+
     printf("Type in a short string to send to the kernel module:\n");
 
     // Read in a string (with spaces), changes delimeter to new line.
@@ -54,8 +55,6 @@ int main(void)
       perror("Failed to write the message to the device.");
       return errno;
     }
-
-    int command = 4;
 
     printf("1 - Set message to all lowercase\n");
     printf("2 - Set message to all uppercase\n");
@@ -75,7 +74,7 @@ int main(void)
     printf("Press ENTER to read back from the device...\n");
     getchar();
     printf("Reading from the device...\n");
-    
+
     ret = read(file_descriptor, receive, BUFFER_LENGTH);
     if(ret < 0)
     {
@@ -86,6 +85,8 @@ int main(void)
 
     printf("Send message to driver? [Y/n] ");
     scanf("%[^\n]%*c", &choice);
+
+    memset(receive, 0, BUFFER_LENGTH);
   }
 
   printf("End of the program\n");
