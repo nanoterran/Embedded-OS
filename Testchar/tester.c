@@ -83,14 +83,12 @@ int main(void)
     }
     printf("The received message is: [%s]\n\n", receive);
 
-    close(file_descriptor);
-
     printf("Send message to driver? [Y/n] ");
     scanf("%[^\n]%*c", &choice);
 
-    memset(receive, 0, BUFFER_LENGTH);
   }
 
+  close(file_descriptor);
   printf("End of the program\n");
 
   return 0;
