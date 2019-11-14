@@ -73,7 +73,7 @@ static int __init testchar_init(void)
   {
     unregister_chrdev(major_number, DEVICE_NAME);
 
-    printk(KERN_ALERT "Failed to register device class\n");
+    printk(KERN_ALERT "TestChar: Failed to register device class\n");
 
     return PTR_ERR(testchar_class);
   }
