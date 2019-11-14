@@ -221,16 +221,23 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
  */
 static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_size, loff_t *offset_ptr)
 {
+  unsigned long bytes_not_copied;
+
   if(data_size <= 0)
   {
-    return 0;
+    return -1;
   }
   printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
 
-  unsigned long bytes_not_copied = copy_from_user(message, data, data_size);
+  bytes_not_copied = copy_from_user(message, data, data_size);
+  if(bytes_not_copied > 0)
+  {
+    printk(KERN_INFO "TestChar: Error while writing\n");
+    return -1;
+  }
   size_of_message = strlen(message);
 
-  return bytes_not_copied;
+  return size_of_message;
 }
 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
