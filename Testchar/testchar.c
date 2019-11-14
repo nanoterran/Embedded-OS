@@ -227,10 +227,10 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
   }
   printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
 
-  sprintf(message, "%s", data);
+  unsigned long bytes_not_copied = copy_from_user(message, data, data_size);
   size_of_message = strlen(message);
 
-  return data_size;
+  return bytes_not_copied;
 }
 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
