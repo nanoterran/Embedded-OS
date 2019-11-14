@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #include "commands.h"
 
 #define BUFFER_LENGTH 256               ///< The buffer length (crude but fine)
@@ -37,8 +38,8 @@ int main(void)
 
   while(choice == 'Y')
   {
-    char receive[BUFFER_LENGTH];
-    char stringToSend[BUFFER_LENGTH];
+    char receive[BUFFER_LENGTH] = {0};
+    char stringToSend[BUFFER_LENGTH] = {0};
     int command = 4;
 
     printf("Type in a short string to send to the kernel module:\n");
