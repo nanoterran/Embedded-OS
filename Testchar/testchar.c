@@ -87,13 +87,13 @@ static int __init testchar_init(void)
     class_destroy(testchar_class);
     unregister_chrdev(major_number, DEVICE_NAME);
 
-    printk(KERN_ALERT "Failed to create the device\n");
+    printk(KERN_ALERT "TestChar: Failed to create the device\n");
 
     return PTR_ERR(testchar_device);
   }
   printk(KERN_INFO "TestChar: device class created correctly\n");
 
-  mutex_init(&ebbchar_mutex);       /// Initialize the mutex lock dynamically at runtime
+  mutex_init(&testchar_mutex);       /// Initialize the mutex lock dynamically at runtime
 
   return 0;
 }
@@ -179,19 +179,6 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
   int error_number = 0;
 
   char modified_message[256] = {0};
-
-  if(device_mode == TESTCHAR_ALLLOWER)
-  {
-    
-  }
-  else if(device_mode == TESTCHAR_ALLUPPER)
-  {
-    
-  }
-  else if(device_mode == TESTCHAR_ALLCAPS)
-  {
-    
-  }
 
   switch(device_mode)
   {
