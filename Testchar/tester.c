@@ -51,7 +51,7 @@ int main(void)
 
     // Send the string to the Loadable Kernel Module
     ret = write(file_descriptor, stringToSend, strlen(stringToSend));
-    if(ret < 0)
+    if(ret > 0)
     {
       perror("Failed to write the message to the device.");
       return errno;
