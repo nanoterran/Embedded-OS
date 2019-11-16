@@ -116,18 +116,6 @@ static void set_led_callback(unsigned long value)
 
   char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
 
-  // if(led_state = ON)
-  // {
-
-  //   *reg = *reg | (!led_state<<21);
-  //   printk("MorseCode: Led On\n", name, pid);
-  // }
-  // else
-  // {
-  //   // We need to setup the timer again
-  //   timer.expires += HZ; // add another delay period
-  //   add_timer(&timer);
-  // }
   if(led_state == 0)
   {
     unsigned long *reg = (long)base_address_ptr + register_offset;
