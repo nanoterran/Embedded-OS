@@ -18,9 +18,11 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A character device driver for morse code.");
 MODULE_VERSION("1.0");
 
-/* the empty string, follwed by 26 letter codes, followed by the 10 numeral codes, followed by the comma,
-   period, and question mark.  */
-
+/**
+ * The empty string, follwed by 26 letter codes,
+ * followed by the 10 numeral codes, followed by the comma,
+ * period, and question mark.
+ */
 char *morse_code[40] =
   {
     "", ".-","-...","-.-.","-..",".","..-.","--.","....","..",
@@ -37,33 +39,47 @@ char *morse_code[40] =
  */
 static DEFINE_MUTEX(morse_mutex);
 
-static int major_number;                       ///< Stores the device number -- determined automatically
-static struct class  *morse_class = NULL;      ///< The device-driver class struct pointer
-static struct device *morse_device = NULL;     ///< The device-driver device struct pointer
-static struct timer_list timer;
-static int led_state;
+static int            major_number;        ///< Stores the device number -- determined automatically
+static struct class  *morse_class = NULL;  ///< The device-driver class struct pointer
+static struct device *morse_device = NULL; ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
-static int     dev_open(struct inode *, struct file *);
-static int     dev_release(struct inode *, struct file *);
-static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
-static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
-static long    dev_ioctl(struct file *, unsigned int, unsigned long);
-static void    set_led_callback(unsigned long value);
+static int          dev_open(struct inode *, struct file *);
+static int          dev_release(struct inode *, struct file *);
+static ssize_t      dev_read(struct file *, char *, size_t, loff_t *);
+static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
+static long         dev_ioctl(struct file *, unsigned int, unsigned long);
+static void         set_led_callback(unsigned long value);
 static inline char *mcodestring(int asciicode);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
  *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
  */
-static struct file_operations file_operations_t = {
-  .open =           dev_open,
-  .read =           dev_read,
-  .write =          dev_write,
-  .release =        dev_release,
+static struct file_operations file_operations_t =
+{
+  .open           = dev_open,
+  .read           = dev_read,
+  .write          = dev_write,
+  .release        = dev_release,
   .unlocked_ioctl = dev_ioctl
 };
 
+/**
+ * Device Drivers global variables
+ */
+static struct timer_list timer;
+static int               led_state;
+static char              message[256] = {0};  ///< Memory for the string that is passed from userspace
+static short             size_of_message;     ///< Used to remember the size of the string stored
+static int               number_of_opens = 0; ///< Counts the number of times the device is opened
+
+/** @brief The LKM initialization function
+ *  The static keyword restricts the visibility of the function to within this C file. The __init
+ *  macro means that for a built-in driver (not a LKM) the function is only used at initialization
+ *  time and that it can be discarded and its memory freed up after that point.
+ *  @return returns 0 if successful
+ */
 static int __init morse_init(void)
 {
   printk(KERN_INFO "MorseCode: Initializing the MorseCode LKM\n");
@@ -104,19 +120,17 @@ static int __init morse_init(void)
   }
   printk(KERN_INFO "MorseCode: device class created correctly\n");
 
-  mutex_init(&morse_mutex);       /// Initialize the mutex lock dynamically at runtime
+  // Initialize the mutex lock dynamically at runtime
+  mutex_init(&morse_mutex);
 
   led_state = 0;
 
+  // Way to initialize a timer for older kernel version
   init_timer(&timer);
-
-  // Set th timer to expire in one second
-  timer.expires = jiffies + HZ;
+  timer.expires = jiffies + HZ;      // Expires every one second
   timer.data = NULL;
   timer.function = set_led_callback;
-
-  // Registers the timer
-  add_timer(&timer);
+  add_timer(&timer);                 // Registers the timer
 
   return 0;
 }
@@ -126,7 +140,20 @@ static int __init morse_init(void)
  */
 static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 {
-  return 0;   // Successfully opened
+  /**
+   * Try to acquire the mutex (i.e., put the lock on/down)
+   * returns 1 if successful and 0 if there is contention
+   */
+  if(!mutex_trylock(&testchar_mutex)){
+    printk(KERN_ALERT "TestChar: Device in use by another process\n");
+
+    return -EBUSY;
+  }
+  printk(KERN_INFO "TestChar: Driver have been opened\n");
+
+  number_of_opens++;
+
+  return 0;   // Successfully opened opened
 }
 
 /**
@@ -150,7 +177,23 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_si
  */
 static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_size, loff_t *offset_ptr)
 {
-  return 0;
+  unsigned long bytes_not_copied;
+
+  if(data_size <= 0)
+  {
+    return -1;
+  }
+  printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
+
+  bytes_not_copied = copy_from_user(message, data, data_size);
+  if(bytes_not_copied > 0)
+  {
+    printk(KERN_INFO "TestChar: Error while writing\n");
+    return -1;
+  }
+  size_of_message = strlen(message);
+
+  return size_of_message;
 }
 
 /**
@@ -219,6 +262,9 @@ static inline char *mcodestring(int asciicode)
    return mc;
 }
 
+/**
+ * 
+ */
 static void __exit morse_exit(void)
 {
   device_destroy(morse_class, MKDEV(major_number, 0)); // remove the device
