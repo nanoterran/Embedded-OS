@@ -1,4 +1,3 @@
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -8,6 +7,7 @@
 #include <linux/uaccess.h>
 #include <linux/ctype.h>
 #include <linux/mutex.h>
+#include <asm/io.h>
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
@@ -23,9 +23,12 @@ MODULE_VERSION("1.0");
  * DEFINE_MUTEX_LOCKED() results in a variable with value 0 (locked)
  */
 static DEFINE_MUTEX(morse_mutex);
+
 static int major_number;                       ///< Stores the device number -- determined automatically
 static struct class  *morse_class = NULL;      ///< The device-driver class struct pointer
 static struct device *morse_device = NULL;     ///< The device-driver device struct pointer
+static struct timer_list timer;
+static int led_state;
 
 // The prototype functions for the character driver -- must come before the struct definition
 static int     dev_open(struct inode *, struct file *);
@@ -33,6 +36,7 @@ static int     dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 static long    dev_ioctl(struct file *, unsigned int, unsigned long);
+static void    set_led_callback(unsigned long value);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -88,7 +92,59 @@ static int __init morse_init(void)
 
   mutex_init(&morse_mutex);       /// Initialize the mutex lock dynamically at runtime
 
+  led_state = 0;
+
+  init_timer(&timer);
+
+  // Set th timer to expire in one second
+  timer.expires = jiffies + HZ;
+  timer.data = NULL;
+  timer.function = set_led_callback;
+
+  // Registers the timer
+  add_timer(&timer);
+
   return 0;
+}
+
+static void set_led_callback(unsigned long value)
+{
+  unsigned long gpio1_base_address = 0x4804C000;
+  unsigned long gpio1_base_end_address = 0x4804E000;
+  unsigned long register_offset = 0x13C;
+  unsigned long clear_register_offset = 0x190;
+
+  char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
+
+  // if(led_state = ON)
+  // {
+
+  //   *reg = *reg | (!led_state<<21);
+  //   printk("MorseCode: Led On\n", name, pid);
+  // }
+  // else
+  // {
+  //   // We need to setup the timer again
+  //   timer.expires += HZ; // add another delay period
+  //   add_timer(&timer);
+  // }
+  if(led_state == 0)
+  {
+    unsigned long *reg = (long)base_address_ptr + register_offset;
+    *reg = *reg | (1<<21);
+    printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
+    led_state = 1;
+  }
+  else
+  {
+    unsigned long *reg = (long)base_address_ptr + clear_register_offset;
+    *reg = *reg | (1<<21);
+    printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
+    led_state = 0;
+  }
+  
+  timer.expires += HZ; // add another delay period
+  add_timer(&timer);
 }
 
 /**
@@ -123,6 +179,9 @@ static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_si
   return 0;
 }
 
+/**
+ * Allows the user to set mode of the driver
+ */
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
 {
   return 0;
@@ -135,6 +194,7 @@ static void __exit morse_exit(void)
   class_destroy(morse_class);                          // remove the device class
   unregister_chrdev(major_number, DEVICE_NAME);        // unregister the major number
   mutex_destroy(&morse_mutex);                         // destroy the dynamically-allocated mutex
+  del_timer(&timer);
 
   printk(KERN_INFO "MorseCode: Goodbye from the Device Driver!\n");
 }
