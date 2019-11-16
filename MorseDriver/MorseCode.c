@@ -11,11 +11,24 @@
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
+#define CQ_DEFAULT	0
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A character device driver for morse code.");
 MODULE_VERSION("1.0");
+
+/* the empty string, follwed by 26 letter codes, followed by the 10 numeral codes, followed by the comma,
+   period, and question mark.  */
+
+char *morse_code[40] =
+  {
+    "", ".-","-...","-.-.","-..",".","..-.","--.","....","..",
+    ".---","-.-",".-..","--","-.","---",".--.","--.-",".-.",
+    "...","-","..-","...-",".--","-..-","-.--","--..","-----",
+    ".----","..---","...--","....-",".....","-....","--...",
+    "---..","----.","--..--","-.-.-.","..--.."
+  };
 
 /**
  * A macro that is used to declare a new mutex that is visible in this file
@@ -37,6 +50,7 @@ static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 static long    dev_ioctl(struct file *, unsigned int, unsigned long);
 static void    set_led_callback(unsigned long value);
+static inline char *mcodestring(int asciicode);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -107,34 +121,6 @@ static int __init morse_init(void)
   return 0;
 }
 
-static void set_led_callback(unsigned long value)
-{
-  unsigned long gpio1_base_address = 0x4804C000;
-  unsigned long gpio1_base_end_address = 0x4804E000;
-  unsigned long register_offset = 0x13C;
-  unsigned long clear_register_offset = 0x190;
-
-  char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
-
-  if(led_state == 0)
-  {
-    unsigned long *reg = (long)base_address_ptr + register_offset;
-    *reg = *reg | (1<<21);
-    printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
-    led_state = 1;
-  }
-  else
-  {
-    unsigned long *reg = (long)base_address_ptr + clear_register_offset;
-    *reg = *reg | (1<<21);
-    printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
-    led_state = 0;
-  }
-  
-  timer.expires += HZ; // add another delay period
-  add_timer(&timer);
-}
-
 /**
  * Allows users to open the device driver
  */
@@ -175,6 +161,64 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
+static void set_led_callback(unsigned long value)
+{
+  unsigned long gpio1_base_address = 0x4804C000;
+  unsigned long gpio1_base_end_address = 0x4804E000;
+  unsigned long register_offset = 0x13C;
+  unsigned long clear_register_offset = 0x190;
+
+  char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
+
+  if(led_state == 0)
+  {
+    unsigned long *reg = (long)base_address_ptr + register_offset;
+    *reg = *reg | (1<<21);
+    printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
+    led_state = 1;
+  }
+  else
+  {
+    unsigned long *reg = (long)base_address_ptr + clear_register_offset;
+    *reg = *reg | (1<<21);
+    printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
+    led_state = 0;
+  }
+  
+  timer.expires += HZ; // add another delay period
+  add_timer(&timer);
+}
+
+/**
+ * Maps the ascii value to its morse code string.
+ */
+static inline char *mcodestring(int asciicode)
+{
+   char *mc;   // this is the mapping from the ASCII code into the mcodearray of strings.
+
+   if (asciicode > 122)  // Past 'z'
+      mc = morse_code[CQ_DEFAULT];
+   else if (asciicode > 96)  // Upper Case
+      mc = morse_code[asciicode - 96];
+   else if (asciicode > 90)  // uncoded punctuation
+      mc = morse_code[CQ_DEFAULT];
+   else if (asciicode > 64)  // Lower Case 
+      mc = morse_code[asciicode - 64];
+   else if (asciicode == 63)  // Question Mark
+      mc = morse_code[39];    // 36 + 3 
+   else if (asciicode > 57)  // uncoded punctuation
+      mc = morse_code[CQ_DEFAULT];
+   else if (asciicode > 47)  // Numeral
+      mc = morse_code[asciicode - 21];  // 27 + (asciicode - 48) 
+   else if (asciicode == 46)  // Period
+      mc = morse_code[38];  // 36 + 2 
+   else if (asciicode == 44)  // Comma
+      mc = morse_code[37];   // 36 + 1
+   else
+      mc = morse_code[CQ_DEFAULT];
+   return mc;
+}
+
 static void __exit morse_exit(void)
 {
   device_destroy(morse_class, MKDEV(major_number, 0)); // remove the device
@@ -184,7 +228,7 @@ static void __exit morse_exit(void)
   mutex_destroy(&morse_mutex);                         // destroy the dynamically-allocated mutex
   del_timer(&timer);
 
-  printk(KERN_INFO "MorseCode: Goodbye from the Device Driver!\n");
+  printk(KERN_INFO "MorseCode: Goodbye from the Morse Code Device Driver!\n");
 }
 
 module_init(morse_init);
