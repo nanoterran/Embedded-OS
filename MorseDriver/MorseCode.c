@@ -135,8 +135,10 @@ static int __init morse_init(void)
   return 0;
 }
 
-/**
- * Allows users to open the device driver
+/** @brief The device open function that is called each time the device is opened
+ *  This will only increment the numberOpens counter in this case.
+ *  @param inode_ptr A pointer to an inode object (defined in linux/fs.h)
+ *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
  */
 static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 {
@@ -156,36 +158,48 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
   return 0;   // Successfully opened opened
 }
 
-/**
- * Allows users to close the device driver.
+/** @brief The device release function that is called whenever the device is closed/released by
+ *  the userspace program
+ *  @param inode_ptr A pointer to an inode object (defined in linux/fs.h)
+ *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
   return 0;   // Sucessfully released
 }
 
-/**
- * Allows the device driver to send data to user programs.
+/** @brief This function is called whenever device is being read from user space i.e. data is
+ *  being sent from the device to the user. In this case is uses the copy_to_user() function to
+ *  send the buffer string to the user and captures any errors.
+ *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
+ *  @param user_buffer The pointer to the buffer to which this function writes the data
+ *  @param buffer_size The length of the b
+ *  @param offset_ptr The offset if required
  */
-static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t data_size, loff_t *offset_ptr)
+static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t buffer_size, loff_t *offset_ptr)
 {
   return 0;
 }
 
-/**
- * Allows user programs to write data to the device driver.
+/** @brief This function is called whenever the device is being written to from user space i.e.
+ *  data is sent to the device from the user. The data is copied to the message[] array in this
+ *  LKM using the copy_from_user() function along with the length of the string.
+ *  @param file_ptr A pointer to a file object
+ *  @param user_buffer The buffer to that contains the string to write to the device
+ *  @param buffer_size The length of the array of data that is being passed in the const char buffer
+ *  @param offset_ptr The offset if required
  */
-static ssize_t dev_write(struct file *file_ptr, const char *data, size_t data_size, loff_t *offset_ptr)
+static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t buffer_size, loff_t *offset_ptr)
 {
   unsigned long bytes_not_copied;
 
-  if(data_size <= 0)
+  if(buffer_size <= 0)
   {
     return -1;
   }
   printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
 
-  bytes_not_copied = copy_from_user(message, data, data_size);
+  bytes_not_copied = copy_from_user(message, user_buffer, buffer_size);
   if(bytes_not_copied > 0)
   {
     printk(KERN_INFO "TestChar: Error while writing\n");
@@ -262,8 +276,9 @@ static inline char *mcodestring(int asciicode)
    return mc;
 }
 
-/**
- * 
+/** @brief The LKM cleanup function
+ *  Similar to the initialization function, it is static. The __exit macro notifies that if this
+ *  code is used for a built-in driver (not a LKM) that this function is not required.
  */
 static void __exit morse_exit(void)
 {
