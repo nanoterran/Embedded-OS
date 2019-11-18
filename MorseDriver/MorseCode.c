@@ -230,15 +230,15 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
       morse_code_iterator++;
     }
 
-    if(message[i] == ' ')
+    if(morse_code_char == "")
     {
       morse_code[morse_code_iterator - 1] = '$';
     }
     else
     {
-      morse_code[morse_code_iterator - 1] = '#';
+      morse_code[morse_code_iterator] = '#';
+      morse_code_iterator++;
     }
-    morse_code_iterator++;
   }
   morse_code_length = strlen(morse_code);
   printk(KERN_INFO "Message %s\n", morse_code);
