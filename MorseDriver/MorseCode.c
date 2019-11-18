@@ -11,6 +11,7 @@
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
+#define MAX_SIZE 256
 #define CQ_DEFAULT	0
 
 MODULE_AUTHOR("Javier Vega");
@@ -23,7 +24,7 @@ MODULE_VERSION("1.0");
  * followed by the 10 numeral codes, followed by the comma,
  * period, and question mark.
  */
-char *morse_code[40] =
+char *morse_code_lookup_table[40] =
   {
     "", ".-","-...","-.-.","-..",".","..-.","--.","....","..",
     ".---","-.-",".-..","--","-.","---",".--.","--.-",".-.",
@@ -50,7 +51,8 @@ static ssize_t      dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
 static long         dev_ioctl(struct file *, unsigned int, unsigned long);
 static void         set_led_callback(unsigned long value);
-static inline char *mcodestring(int asciicode);
+static inline char *ascii_to_morsecode(int asciicode);
+static void         convert_message_to_morsecode(char *message, size_t size);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -69,10 +71,10 @@ static struct file_operations file_operations_t =
  * Device Drivers global variables
  */
 static struct timer_list timer;
-static int               led_state;
-static char              message[256] = {0};  ///< Memory for the string that is passed from userspace
-static short             size_of_message;     ///< Used to remember the size of the string stored
-static int               number_of_opens = 0; ///< Counts the number of times the device is opened
+static char              morse_code[MAX_SIZE] = {0};
+static short             morse_code_length = 0;
+static short             morse_code_iterator = -1;
+static int               number_of_opens = 0;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -123,14 +125,12 @@ static int __init morse_init(void)
   // Initialize the mutex lock dynamically at runtime
   mutex_init(&morse_mutex);
 
-  led_state = 0;
-
   // Way to initialize a timer for older kernel version
-  init_timer(&timer);
-  timer.expires = jiffies + HZ;      // Expires every one second
-  timer.data = NULL;
-  timer.function = set_led_callback;
-  add_timer(&timer);                 // Registers the timer
+  // init_timer(&timer);
+  // timer.expires = jiffies + HZ;      // Expires every one second
+  // timer.data = NULL;
+  // timer.function = set_led_callback;
+  // add_timer(&timer);                 // Registers the timer
 
   return 0;
 }
@@ -146,7 +146,7 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
    * Try to acquire the mutex (i.e., put the lock on/down)
    * returns 1 if successful and 0 if there is contention
    */
-  if(!mutex_trylock(&testchar_mutex)){
+  if(!mutex_trylock(&morse_mutex)){
     printk(KERN_ALERT "TestChar: Device in use by another process\n");
 
     return -EBUSY;
@@ -192,22 +192,57 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t buffer_
 static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t buffer_size, loff_t *offset_ptr)
 {
   unsigned long bytes_not_copied;
+  char message[MAX_SIZE] = {0};
+  int size_of_message = 0;
 
   if(buffer_size <= 0)
   {
     return -1;
   }
-  printk(KERN_INFO "TestChar: Received %lu characters from the user\n", data_size);
+  printk(KERN_INFO "MorseCode: Received %lu characters from the user\n", buffer_size);
 
   bytes_not_copied = copy_from_user(message, user_buffer, buffer_size);
   if(bytes_not_copied > 0)
   {
-    printk(KERN_INFO "TestChar: Error while writing\n");
+    printk(KERN_INFO "MorseCode: Error while writing\n");
     return -1;
   }
   size_of_message = strlen(message);
 
+  convert_message_to_morsecode(message, size_of_message);
+
   return size_of_message;
+}
+
+static void convert_message_to_morsecode(char *message, size_t message_size)
+{
+  int i;
+  int j;
+  morse_code_iterator = 0;
+
+  for(i = 0; i < message_size; i++)
+  {
+    char *morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
+
+    for(j = 0; j < strlen(morse_code_char); j++)
+    {
+      morse_code[morse_code_iterator] = morse_code_char[j];
+      morse_code_iterator++;
+    }
+
+    if(message[i] == ' ')
+    {
+      morse_code[morse_code_iterator - 1] = '$';
+    }
+    else
+    {
+      morse_code[morse_code_iterator - 1] = '#';
+    }
+    morse_code_iterator++;
+  }
+  morse_code_length = strlen(morse_code);
+  printk(KERN_INFO "Message %s\n", morse_code);
+  printk(KERN_INFO "Length %i\n", morse_code_length);
 }
 
 /**
@@ -227,52 +262,52 @@ static void set_led_callback(unsigned long value)
 
   char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
 
-  if(led_state == 0)
-  {
-    unsigned long *reg = (long)base_address_ptr + register_offset;
-    *reg = *reg | (1<<21);
-    printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
-    led_state = 1;
-  }
-  else
-  {
-    unsigned long *reg = (long)base_address_ptr + clear_register_offset;
-    *reg = *reg | (1<<21);
-    printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
-    led_state = 0;
-  }
+  // if(led_state == 0)
+  // {
+  //   unsigned long *reg = (long)base_address_ptr + register_offset;
+  //   *reg = *reg | (1<<21);
+  //   printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
+  //   led_state = 1;
+  // }
+  // else
+  // {
+  //   unsigned long *reg = (long)base_address_ptr + clear_register_offset;
+  //   *reg = *reg | (1<<21);
+  //   printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
+  //   led_state = 0;
+  // }
   
-  timer.expires += HZ; // add another delay period
-  add_timer(&timer);
+  // timer.expires += HZ; // add another delay period
+  // add_timer(&timer);
 }
 
 /**
  * Maps the ascii value to its morse code string.
  */
-static inline char *mcodestring(int asciicode)
+static inline char *ascii_to_morsecode(int asciicode)
 {
    char *mc;   // this is the mapping from the ASCII code into the mcodearray of strings.
 
    if (asciicode > 122)  // Past 'z'
-      mc = morse_code[CQ_DEFAULT];
+      mc = morse_code_lookup_table[CQ_DEFAULT];
    else if (asciicode > 96)  // Upper Case
-      mc = morse_code[asciicode - 96];
+      mc = morse_code_lookup_table[asciicode - 96];
    else if (asciicode > 90)  // uncoded punctuation
-      mc = morse_code[CQ_DEFAULT];
+      mc = morse_code_lookup_table[CQ_DEFAULT];
    else if (asciicode > 64)  // Lower Case 
-      mc = morse_code[asciicode - 64];
+      mc = morse_code_lookup_table[asciicode - 64];
    else if (asciicode == 63)  // Question Mark
-      mc = morse_code[39];    // 36 + 3 
+      mc = morse_code_lookup_table[39];    // 36 + 3 
    else if (asciicode > 57)  // uncoded punctuation
-      mc = morse_code[CQ_DEFAULT];
+      mc = morse_code_lookup_table[CQ_DEFAULT];
    else if (asciicode > 47)  // Numeral
-      mc = morse_code[asciicode - 21];  // 27 + (asciicode - 48) 
+      mc = morse_code_lookup_table[asciicode - 21];  // 27 + (asciicode - 48) 
    else if (asciicode == 46)  // Period
-      mc = morse_code[38];  // 36 + 2 
+      mc = morse_code_lookup_table[38];  // 36 + 2 
    else if (asciicode == 44)  // Comma
-      mc = morse_code[37];   // 36 + 1
+      mc = morse_code_lookup_table[37];   // 36 + 1
    else
-      mc = morse_code[CQ_DEFAULT];
+      mc = morse_code_lookup_table[CQ_DEFAULT];
    return mc;
 }
 
