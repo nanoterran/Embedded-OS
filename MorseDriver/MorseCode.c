@@ -33,6 +33,15 @@ char *morse_code_lookup_table[40] =
     "---..","----.","--..--","-.-.-.","..--.."
   };
 
+enum
+{
+  DotTimeInMilliSec                 = 500 * HZ / 1000,
+  DashTimeInMilliSec                = 1500 * HZ / 1000,
+  IntraCharacterSpaceTimeInMilliSec = 200 * HZ / 1000,  // space between dots and dashes
+  InterCharacterSpaceTimeInMilliSec = 600 * HZ / 1000,  // space between characters of a word
+  WordSpaceTimeInMilliSec           = 1400 * HZ / 1000  // space between words
+};
+
 /**
  * A macro that is used to declare a new mutex that is visible in this file
  * results in a semaphore variable ebbchar_mutex with value 1 (unlocked)
@@ -50,7 +59,7 @@ static int          dev_release(struct inode *, struct file *);
 static ssize_t      dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
 static long         dev_ioctl(struct file *, unsigned int, unsigned long);
-static void         set_led_callback(unsigned long value);
+static void         morse_code_to_led(unsigned long value);
 static inline char *ascii_to_morsecode(int asciicode);
 static void         convert_message_to_morsecode(char *message, size_t size);
 
@@ -75,6 +84,8 @@ static char              morse_code[MAX_SIZE] = {0};
 static short             morse_code_length = 0;
 static short             morse_code_iterator = -1;
 static int               number_of_opens = 0;
+static int               space = 0;
+// static const long        DotTimeInMilliSec = 500 * HZ / 1000;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -126,11 +137,7 @@ static int __init morse_init(void)
   mutex_init(&morse_mutex);
 
   // Way to initialize a timer for older kernel version
-  // init_timer(&timer);
-  // timer.expires = jiffies + HZ;      // Expires every one second
-  // timer.data = NULL;
-  // timer.function = set_led_callback;
-  // add_timer(&timer);                 // Registers the timer
+  init_timer(&timer);
 
   return 0;
 }
@@ -147,11 +154,11 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
    * returns 1 if successful and 0 if there is contention
    */
   if(!mutex_trylock(&morse_mutex)){
-    printk(KERN_ALERT "TestChar: Device in use by another process\n");
+    printk(KERN_ALERT "MorseCode: Device in use by another process\n");
 
     return -EBUSY;
   }
-  printk(KERN_INFO "TestChar: Driver have been opened\n");
+  printk(KERN_INFO "MorseCode: Driver have been opened\n");
 
   number_of_opens++;
 
@@ -210,10 +217,21 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   size_of_message = strlen(message);
 
   convert_message_to_morsecode(message, size_of_message);
+  space = 0;
+
+  // Add the callback function to timer to start displaying morse code
+  timer.expires = jiffies;
+  timer.data = (unsigned long)NULL;
+  timer.function = morse_code_to_led;
+  add_timer(&timer);
 
   return size_of_message;
 }
 
+/** @brief Converts the message writen by the user to morse code string.
+ *  @param message The message writen by the user
+ *  @param message_size The size of the message
+ */
 static void convert_message_to_morsecode(char *message, size_t message_size)
 {
   int i;
@@ -230,7 +248,7 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
       morse_code_iterator++;
     }
 
-    if(morse_code_char == "")
+    if(morse_code_char[morse_code_iterator - 1] == '\0')
     {
       morse_code[morse_code_iterator - 1] = '$';
     }
@@ -240,9 +258,13 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
       morse_code_iterator++;
     }
   }
+
+  morse_code[morse_code_iterator - 1] = '\0';
   morse_code_length = strlen(morse_code);
-  printk(KERN_INFO "Message %s\n", morse_code);
-  printk(KERN_INFO "Length %i\n", morse_code_length);
+  morse_code_iterator = 0;
+
+  printk(KERN_INFO "MorseCode: Morse Message %s\n", morse_code);
+  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse_code_length);
 }
 
 /**
@@ -253,14 +275,61 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
-static void set_led_callback(unsigned long value)
+static void morse_code_to_led(unsigned long value)
 {
-  unsigned long gpio1_base_address = 0x4804C000;
-  unsigned long gpio1_base_end_address = 0x4804E000;
-  unsigned long register_offset = 0x13C;
-  unsigned long clear_register_offset = 0x190;
+  // unsigned long gpio1_base_address = 0x4804C000;
+  // unsigned long gpio1_base_end_address = 0x4804E000;
+  // unsigned long register_offset = 0x13C;
+  // unsigned long clear_register_offset = 0x190;
 
-  char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
+  // char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
+
+  if(morse_code_iterator >= morse_code_length)
+  {
+    return;
+  }
+
+  if(!space)
+  {
+    char current_character = morse_code[morse_code_iterator];
+
+    if(current_character == '.' )
+    {
+      // unsigned long *reg = (long)base_address_ptr + register_offset;
+      // *reg = *reg | (1<<21);
+      printk(KERN_INFO "MorseCode: Dot\n");
+      timer.expires += HZ * (DotTimeInMilliSec / 1000.0);
+      add_timer(&timer);
+      space = 1;
+    }
+    else if(current_character == '-')
+    {
+      printk(KERN_INFO "MorseCode: Dash\n");
+      timer.expires += HZ * (DashTimeInMilliSec / 1000.0);
+      add_timer(&timer);
+      space = 1;
+    }
+    else if(current_character == '#')
+    {
+      printk(KERN_INFO "MorseCode: Between Letters\n");
+      timer.expires += HZ * (InterCharacterSpaceTimeInMilliSec / 1000.0);
+      add_timer(&timer);
+    }
+    else if(current_character == '$')
+    {
+      printk(KERN_INFO "MorseCode: Between Word\n");
+      timer.expires += HZ * (WordSpaceTimeInMilliSec / 1000.0);
+      add_timer(&timer);
+    }
+    morse_code_iterator++;
+  }
+  else
+  {
+    printk(KERN_INFO "MorseCode: Between Dots and Dashes\n");
+    timer.expires += HZ * (IntraCharacterSpaceTimeInMilliSec / 1000.0);
+    add_timer(&timer);
+    space = 0;
+  }
 
   // if(led_state == 0)
   // {
