@@ -8,11 +8,23 @@
 #include <linux/ctype.h>
 #include <linux/mutex.h>
 #include <asm/io.h>
+#include <asm/div64.h>
+#include <linux/jiffies.h>
+#include <linux/types.h>
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
 #define MAX_SIZE 256
 #define CQ_DEFAULT	0
+
+
+// static long MULTIPLIER = do_div(var, 1000);
+
+// #define DotTimeInMilliSec (5 * HZ) // = (500 * MULTIPLIER);
+// #define DashTimeInMilliSec (1.5 * HZ) // = (1500 * MULTIPLIER);
+// #define IntraCharacterSpaceTimeInMilliSec (0.2 * HZ) // = (200 * MULTIPLIER);  // space between dots and dashes
+// #define InterCharacterSpaceTimeInMilliSec (0.6 * HZ) // = (600 * MULTIPLIER);  // space between characters of a word
+// #define WordSpaceTimeInMilliSec (1.4 * HZ)// = (1400 * MULTIPLIER);  // space between words
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
@@ -35,11 +47,11 @@ char *morse_code_lookup_table[40] =
 
 enum
 {
-  DotTimeInMilliSec                 = 500 * HZ / 1000,
-  DashTimeInMilliSec                = 1500 * HZ / 1000,
-  IntraCharacterSpaceTimeInMilliSec = 200 * HZ / 1000,  // space between dots and dashes
-  InterCharacterSpaceTimeInMilliSec = 600 * HZ / 1000,  // space between characters of a word
-  WordSpaceTimeInMilliSec           = 1400 * HZ / 1000  // space between words
+  DotTimeInMilliSec                 = 500,
+  DashTimeInMilliSec                = 1500,
+  IntraCharacterSpaceTimeInMilliSec = 200,  // space between dots and dashes
+  InterCharacterSpaceTimeInMilliSec = 600,  // space between characters of a word
+  WordSpaceTimeInMilliSec           = 1400  // space between words
 };
 
 /**
@@ -59,7 +71,8 @@ static int          dev_release(struct inode *, struct file *);
 static ssize_t      dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
 static long         dev_ioctl(struct file *, unsigned int, unsigned long);
-static void         morse_code_to_led(unsigned long value);
+static void         process_morse_code(unsigned long value);
+static void         intra_character_space(unsigned long value);
 static inline char *ascii_to_morsecode(int asciicode);
 static void         convert_message_to_morsecode(char *message, size_t size);
 
@@ -85,7 +98,11 @@ static short             morse_code_length = 0;
 static short             morse_code_iterator = -1;
 static int               number_of_opens = 0;
 static int               space = 0;
-// static const long        DotTimeInMilliSec = 500 * HZ / 1000;
+static uint64_t          DotTimeInJiffies = DotTimeInMilliSec * HZ;
+static uint64_t          DashTimeInJiffies = DashTimeInMilliSec * HZ;
+static uint64_t          IntraCharacterSpaceTimeInJiffies = IntraCharacterSpaceTimeInMilliSec * HZ;
+static uint64_t          InterCharacterSpaceTimeInJiffies = InterCharacterSpaceTimeInMilliSec * HZ;
+static uint64_t          WordSpaceTimeInJiffies = WordSpaceTimeInMilliSec * HZ;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -139,6 +156,23 @@ static int __init morse_init(void)
   // Way to initialize a timer for older kernel version
   init_timer(&timer);
 
+  do_div(DotTimeInJiffies, 1000);
+  do_div(DashTimeInJiffies, 1000);
+  do_div(IntraCharacterSpaceTimeInJiffies, 1000);
+  do_div(InterCharacterSpaceTimeInJiffies, 1000);
+  do_div(WordSpaceTimeInJiffies, 1000);
+  // DashTimeInMilliSec = (1500 * HZ);
+  // IntraCharacterSpaceTimeInMilliSec = (200 * HZ);  // space between dots and dashes
+  // InterCharacterSpaceTimeInMilliSec = (600 * HZ);  // space between characters of a word
+  // WordSpaceTimeInMilliSec = (1400 * HZ);  // space between words
+
+  // printk(KERN_INFO "Value = %llu\n", val);
+  // printk(KERN_INFO "Rem = %d\n", rem);
+  // printk(KERN_INFO "Dot = %l\n", DashTimeInMilliSec);
+  // printk(KERN_INFO "Dot = %l\n", IntraCharacterSpaceTimeInMilliSec);
+  // printk(KERN_INFO "Dot = %l\n", InterCharacterSpaceTimeInMilliSec);
+  // printk(KERN_INFO "Dot = %l\n", WordSpaceTimeInMilliSec);
+
   return 0;
 }
 
@@ -172,6 +206,9 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
+  // Releases the mutex (i.e., the lock goes up)
+  mutex_unlock(&morse_mutex);
+
   return 0;   // Sucessfully released
 }
 
@@ -217,12 +254,11 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   size_of_message = strlen(message);
 
   convert_message_to_morsecode(message, size_of_message);
-  space = 0;
 
   // Add the callback function to timer to start displaying morse code
   timer.expires = jiffies;
   timer.data = (unsigned long)NULL;
-  timer.function = morse_code_to_led;
+  timer.function = process_morse_code;
   add_timer(&timer);
 
   return size_of_message;
@@ -275,7 +311,16 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
-static void morse_code_to_led(unsigned long value)
+static void intra_character_space(unsigned long value)
+{
+  printk(KERN_INFO "MorseCode: Space Between Dots and Dashes\n");
+
+  timer.expires += IntraCharacterSpaceTimeInJiffies;
+  timer.function = process_morse_code;
+  add_timer(&timer);
+}
+
+static void process_morse_code(unsigned long value)
 {
   // unsigned long gpio1_base_address = 0x4804C000;
   // unsigned long gpio1_base_end_address = 0x4804E000;
@@ -283,53 +328,48 @@ static void morse_code_to_led(unsigned long value)
   // unsigned long clear_register_offset = 0x190;
 
   // char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
+  // unsigned long *reg = (long)base_address_ptr + register_offset;
+  // *reg = *reg | (1<<21);
 
   if(morse_code_iterator >= morse_code_length)
   {
     return;
   }
 
-  if(!space)
-  {
-    char current_character = morse_code[morse_code_iterator];
+  char current_character = morse_code[morse_code_iterator];
 
-    if(current_character == '.' )
-    {
-      // unsigned long *reg = (long)base_address_ptr + register_offset;
-      // *reg = *reg | (1<<21);
-      printk(KERN_INFO "MorseCode: Dot\n");
-      timer.expires += HZ * (DotTimeInMilliSec / 1000.0);
-      add_timer(&timer);
-      space = 1;
-    }
-    else if(current_character == '-')
-    {
-      printk(KERN_INFO "MorseCode: Dash\n");
-      timer.expires += HZ * (DashTimeInMilliSec / 1000.0);
-      add_timer(&timer);
-      space = 1;
-    }
-    else if(current_character == '#')
-    {
-      printk(KERN_INFO "MorseCode: Between Letters\n");
-      timer.expires += HZ * (InterCharacterSpaceTimeInMilliSec / 1000.0);
-      add_timer(&timer);
-    }
-    else if(current_character == '$')
-    {
-      printk(KERN_INFO "MorseCode: Between Word\n");
-      timer.expires += HZ * (WordSpaceTimeInMilliSec / 1000.0);
-      add_timer(&timer);
-    }
-    morse_code_iterator++;
-  }
-  else
+  if(current_character == '.')
   {
-    printk(KERN_INFO "MorseCode: Between Dots and Dashes\n");
-    timer.expires += HZ * (IntraCharacterSpaceTimeInMilliSec / 1000.0);
+    printk(KERN_INFO "MorseCode: Dot\n");
+
+    timer.expires += DotTimeInJiffies;
+    timer.function = intra_character_space;
     add_timer(&timer);
-    space = 0;
   }
+  else if(current_character == '-')
+  {
+    printk(KERN_INFO "MorseCode: Dash\n");
+
+    timer.expires += DashTimeInJiffies;
+    timer.function = intra_character_space;
+    add_timer(&timer);
+  }
+  else if(current_character == '#')
+  {
+    printk(KERN_INFO "MorseCode: Between Letters\n");
+
+    timer.expires += InterCharacterSpaceTimeInJiffies;
+    timer.function = process_morse_code;
+    add_timer(&timer);
+  }
+  // else if(current_character == '$')
+  // {
+  //   printk(KERN_INFO "MorseCode: Between Word\n");
+
+  //   timer.expires += HZ * (WordSpaceTimeInMilliSec / 1000.0);
+  //   add_timer(&timer);
+  // }
+  morse_code_iterator++;
 
   // if(led_state == 0)
   // {
