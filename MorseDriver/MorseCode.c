@@ -14,22 +14,22 @@
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
-#define MAX_SIZE 256
-#define CQ_DEFAULT	0
-
-
-// static long MULTIPLIER = do_div(var, 1000);
-
-// #define DotTimeInMilliSec (5 * HZ) // = (500 * MULTIPLIER);
-// #define DashTimeInMilliSec (1.5 * HZ) // = (1500 * MULTIPLIER);
-// #define IntraCharacterSpaceTimeInMilliSec (0.2 * HZ) // = (200 * MULTIPLIER);  // space between dots and dashes
-// #define InterCharacterSpaceTimeInMilliSec (0.6 * HZ) // = (600 * MULTIPLIER);  // space between characters of a word
-// #define WordSpaceTimeInMilliSec (1.4 * HZ)// = (1400 * MULTIPLIER);  // space between words
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A character device driver for morse code.");
 MODULE_VERSION("1.0");
+
+#define MAX_SIZE    256
+#define CQ_DEFAULT  0
+
+#define GPIO1_BASE_START_ADDRES             0x4804C000
+#define GPIO1_BASE_END_ADDRESS              0x4804E000
+#define GPIO1_DATAOUT_REGISTER_OFFSET       0x13C
+#define GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET 0x190
+
+#define USR0_LED   (1<<21)
+#define GPIO1_SIZE (GPIO1_BASE_END_ADDRESS - GPIO1_BASE_START_ADDRES)
 
 /**
  * The empty string, follwed by 26 letter codes,
@@ -75,6 +75,8 @@ static void         process_morse_code(unsigned long value);
 static void         intra_character_space(unsigned long value);
 static inline char *ascii_to_morsecode(int asciicode);
 static void         convert_message_to_morsecode(char *message, size_t size);
+static void         turn_on_led(void);
+static void         turn_off_led(void);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -97,12 +99,12 @@ static char              morse_code[MAX_SIZE] = {0};
 static short             morse_code_length = 0;
 static short             morse_code_iterator = -1;
 static int               number_of_opens = 0;
-static int               space = 0;
 static uint64_t          DotTimeInJiffies = DotTimeInMilliSec * HZ;
 static uint64_t          DashTimeInJiffies = DashTimeInMilliSec * HZ;
 static uint64_t          IntraCharacterSpaceTimeInJiffies = IntraCharacterSpaceTimeInMilliSec * HZ;
 static uint64_t          InterCharacterSpaceTimeInJiffies = InterCharacterSpaceTimeInMilliSec * HZ;
 static uint64_t          WordSpaceTimeInJiffies = WordSpaceTimeInMilliSec * HZ;
+static volatile void    *gpio1_address;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -156,24 +158,30 @@ static int __init morse_init(void)
   // Way to initialize a timer for older kernel version
   init_timer(&timer);
 
+  // Get the virtual memory from the physical memory
+  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
+
   do_div(DotTimeInJiffies, 1000);
   do_div(DashTimeInJiffies, 1000);
   do_div(IntraCharacterSpaceTimeInJiffies, 1000);
   do_div(InterCharacterSpaceTimeInJiffies, 1000);
   do_div(WordSpaceTimeInJiffies, 1000);
-  // DashTimeInMilliSec = (1500 * HZ);
-  // IntraCharacterSpaceTimeInMilliSec = (200 * HZ);  // space between dots and dashes
-  // InterCharacterSpaceTimeInMilliSec = (600 * HZ);  // space between characters of a word
-  // WordSpaceTimeInMilliSec = (1400 * HZ);  // space between words
-
-  // printk(KERN_INFO "Value = %llu\n", val);
-  // printk(KERN_INFO "Rem = %d\n", rem);
-  // printk(KERN_INFO "Dot = %l\n", DashTimeInMilliSec);
-  // printk(KERN_INFO "Dot = %l\n", IntraCharacterSpaceTimeInMilliSec);
-  // printk(KERN_INFO "Dot = %l\n", InterCharacterSpaceTimeInMilliSec);
-  // printk(KERN_INFO "Dot = %l\n", WordSpaceTimeInMilliSec);
 
   return 0;
+}
+
+static void turn_on_led(void)
+{
+  unsigned long *set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
+
+  *set_data = *set_data | USR0_LED;
+}
+
+static void turn_off_led(void)
+{
+  unsigned long *clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
+
+  *clear_data = *clear_data | USR0_LED;
 }
 
 /** @brief The device open function that is called each time the device is opened
@@ -316,6 +324,8 @@ static void intra_character_space(unsigned long value)
 {
   printk(KERN_INFO "MorseCode: Space Between Dots and Dashes\n");
 
+  turn_off_led();
+
   timer.expires += IntraCharacterSpaceTimeInJiffies;
   timer.function = process_morse_code;
   add_timer(&timer);
@@ -323,15 +333,6 @@ static void intra_character_space(unsigned long value)
 
 static void process_morse_code(unsigned long value)
 {
-  // unsigned long gpio1_base_address = 0x4804C000;
-  // unsigned long gpio1_base_end_address = 0x4804E000;
-  // unsigned long register_offset = 0x13C;
-  // unsigned long clear_register_offset = 0x190;
-
-  // char *base_address_ptr = ioremap(gpio1_base_address, gpio1_base_end_address - gpio1_base_address);
-  // unsigned long *reg = (long)base_address_ptr + register_offset;
-  // *reg = *reg | (1<<21);
-
   if(morse_code_iterator >= morse_code_length)
   {
     return;
@@ -343,6 +344,8 @@ static void process_morse_code(unsigned long value)
   {
     printk(KERN_INFO "MorseCode: Dot\n");
 
+    turn_on_led();
+
     timer.expires += DotTimeInJiffies;
     timer.function = intra_character_space;
     add_timer(&timer);
@@ -350,6 +353,8 @@ static void process_morse_code(unsigned long value)
   else if(current_character == '-')
   {
     printk(KERN_INFO "MorseCode: Dash\n");
+
+    turn_on_led();
 
     timer.expires += DashTimeInJiffies;
     timer.function = intra_character_space;
@@ -359,36 +364,23 @@ static void process_morse_code(unsigned long value)
   {
     printk(KERN_INFO "MorseCode: Between Letters\n");
 
+    turn_off_led();
+
     timer.expires += InterCharacterSpaceTimeInJiffies;
     timer.function = process_morse_code;
     add_timer(&timer);
   }
-  // else if(current_character == '$')
-  // {
-  //   printk(KERN_INFO "MorseCode: Between Word\n");
+  else if(current_character == '$')
+  {
+    printk(KERN_INFO "MorseCode: Between Word\n");
 
-  //   timer.expires += HZ * (WordSpaceTimeInMilliSec / 1000.0);
-  //   add_timer(&timer);
-  // }
+    turn_off_led();
+
+    timer.expires += WordSpaceTimeInJiffies;
+    timer.function = process_morse_code;
+    add_timer(&timer);
+  }
   morse_code_iterator++;
-
-  // if(led_state == 0)
-  // {
-  //   unsigned long *reg = (long)base_address_ptr + register_offset;
-  //   *reg = *reg | (1<<21);
-  //   printk(KERN_INFO "MorseCode: SetData GPIO1 Register = %d\n", *reg);
-  //   led_state = 1;
-  // }
-  // else
-  // {
-  //   unsigned long *reg = (long)base_address_ptr + clear_register_offset;
-  //   *reg = *reg | (1<<21);
-  //   printk(KERN_INFO "MorseCode: Clear GPIO1 Register = %d\n", *reg);
-  //   led_state = 0;
-  // }
-  
-  // timer.expires += HZ; // add another delay period
-  // add_timer(&timer);
 }
 
 /**
