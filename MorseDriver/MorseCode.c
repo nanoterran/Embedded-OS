@@ -20,9 +20,6 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A character device driver for morse code.");
 MODULE_VERSION("1.0");
 
-#define MAX_SIZE    256
-#define CQ_DEFAULT  0
-
 #define GPIO1_BASE_START_ADDRES             0x4804C000
 #define GPIO1_BASE_END_ADDRESS              0x4804E000
 #define GPIO1_DATAOUT_REGISTER_OFFSET       0x13C
@@ -30,6 +27,11 @@ MODULE_VERSION("1.0");
 
 #define USR0_LED   (1<<21)
 #define GPIO1_SIZE (GPIO1_BASE_END_ADDRESS - GPIO1_BASE_START_ADDRES)
+
+
+#define MAX_SIZE          256
+#define CQ_DEFAULT        0
+#define CHARACTER_OPTIONS 5
 
 /**
  * The empty string, follwed by 26 letter codes,
@@ -45,6 +47,12 @@ char *morse_code_lookup_table[40] =
     "---..","----.","--..--","-.-.-.","..--.."
   };
 
+static typedef struct jiffies_lookup_table
+{
+  char key;
+  uint32_t value;
+} jiffies_lookup_table;
+
 enum
 {
   DotTimeInMilliSec                 = 500,
@@ -53,6 +61,15 @@ enum
   InterCharacterSpaceTimeInMilliSec = 600,  // space between characters of a word
   WordSpaceTimeInMilliSec           = 1400  // space between words
 };
+
+static struct jiffies_lookup_table morse_to_time[] =
+  {
+    { '.', DotTimeInMilliSec },
+    { '-', DashTimeInMilliSec },
+    { ' ', IntraCharacterSpaceTimeInMilliSec },
+    { '#', InterCharacterSpaceTimeInMilliSec },
+    { '$', WordSpaceTimeInMilliSec },
+  };
 
 /**
  * A macro that is used to declare a new mutex that is visible in this file
@@ -104,7 +121,6 @@ static uint64_t          DashTimeInJiffies = DashTimeInMilliSec * HZ;
 static uint64_t          IntraCharacterSpaceTimeInJiffies = IntraCharacterSpaceTimeInMilliSec * HZ;
 static uint64_t          InterCharacterSpaceTimeInJiffies = InterCharacterSpaceTimeInMilliSec * HZ;
 static uint64_t          WordSpaceTimeInJiffies = WordSpaceTimeInMilliSec * HZ;
-static volatile void    *gpio1_address;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -158,9 +174,6 @@ static int __init morse_init(void)
   // Way to initialize a timer for older kernel version
   init_timer(&timer);
 
-  // Get the virtual memory from the physical memory
-  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
-
   do_div(DotTimeInJiffies, 1000);
   do_div(DashTimeInJiffies, 1000);
   do_div(IntraCharacterSpaceTimeInJiffies, 1000);
@@ -172,6 +185,8 @@ static int __init morse_init(void)
 
 static void turn_on_led(void)
 {
+  // Get the virtual memory from the physical memory
+  static volatile void *gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
   unsigned long *set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
 
   *set_data = *set_data | USR0_LED;
@@ -179,6 +194,8 @@ static void turn_on_led(void)
 
 static void turn_off_led(void)
 {
+  // Get the virtual memory from the physical memory
+  static volatile void *gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
   unsigned long *clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
 
   *clear_data = *clear_data | USR0_LED;
@@ -340,6 +357,10 @@ static void process_morse_code(unsigned long value)
 
   char current_character = morse_code[morse_code_iterator];
 
+  process_morse_character(current_character);
+
+  morse_code_iterator++;
+
   if(current_character == '.')
   {
     printk(KERN_INFO "MorseCode: Dot\n");
@@ -380,7 +401,6 @@ static void process_morse_code(unsigned long value)
     timer.function = process_morse_code;
     add_timer(&timer);
   }
-  morse_code_iterator++;
 }
 
 /**
