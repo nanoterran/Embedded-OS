@@ -277,19 +277,20 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   for(i = 0; i < message_size; i++)
   {
     char *morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
+    printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
 
-    for(j = 0; j < strlen(morse_code_char); j++)
-    {
-      morse_code[morse_code_iterator] = morse_code_char[j];
-      morse_code_iterator++;
-    }
-
-    if(morse_code_char[morse_code_iterator - 1] == '\0')
+    if(!strcmp(morse_code_char, ""))
     {
       morse_code[morse_code_iterator - 1] = '$';
     }
     else
     {
+      for(j = 0; j < strlen(morse_code_char); j++)
+      {
+        morse_code[morse_code_iterator] = morse_code_char[j];
+        morse_code_iterator++;
+      }
+
       morse_code[morse_code_iterator] = '#';
       morse_code_iterator++;
     }
