@@ -101,7 +101,7 @@ static struct file_operations file_operations_t =
   .unlocked_ioctl = dev_ioctl
 };
 
-static struct morse_character morse_table[] =
+static const struct morse_character morse_table[] =
   {
     { '.', DotTimeInMilliSec, turn_on_led },
     { '-', DashTimeInMilliSec, turn_on_led },
@@ -331,28 +331,27 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
 void process_morse_character(char character)
 {
   int i;
-  morse_character *currect;
+  struct morse_character *current_character = morse_table;
   
   for(i = 0; i < 5; i++)
   {
-    current = morse_table[i];
-
-    if(current->character == character)
+    if(current_character->character == character)
     {
       break;
     }
+    current++;
   }
 
   // current->action();
 
-  uint64_t jiffies = current->jiffies * HZ;
-  do_div(jiffies, 1000);
+  // uint64_t jiffies = current->jiffies * HZ;
+  // do_div(jiffies, 1000);
 
-  printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current->character);
+  printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current_character->character);
 
-  timer.expires += jiffies;
-  timer.function = process_morse_code;
-  add_timer(&timer);
+  // timer.expires += jiffies;
+  // timer.function = process_morse_code;
+  // add_timer(&timer);
 }
 
 
