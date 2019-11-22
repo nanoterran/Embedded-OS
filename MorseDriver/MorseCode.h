@@ -31,12 +31,12 @@
 #define STATE_DONE 1
 #define STATE_IDLE 2
 
-typedef struct morse_character
+typedef struct morse_character_data
 {
   char     character;
   uint32_t millisec_time;
-  void     (*action)(void);
-} morse_character;
+  void     (*display)(void);
+} morse_character_data;
 
 typedef struct morse_code_device
 {
