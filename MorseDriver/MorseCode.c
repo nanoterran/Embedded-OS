@@ -1,16 +1,4 @@
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/device.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <asm/uaccess.h>
-#include <linux/uaccess.h>
-#include <linux/ctype.h>
-#include <linux/mutex.h>
-#include <asm/io.h>
-#include <asm/div64.h>
-#include <linux/jiffies.h>
-#include <linux/types.h>
+#include "MorseCode.h"
 
 #define DEVICE_NAME "MorseCode"
 #define CLASS_NAME  "Morse"
@@ -19,49 +7,6 @@ MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A character device driver for morse code.");
 MODULE_VERSION("1.0");
-
-#define GPIO1_BASE_START_ADDRES             0x4804C000
-#define GPIO1_BASE_END_ADDRESS              0x4804E000
-#define GPIO1_DATAOUT_REGISTER_OFFSET       0x13C
-#define GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET 0x190
-
-#define USR0_LED   (1<<21)
-#define GPIO1_SIZE (GPIO1_BASE_END_ADDRESS - GPIO1_BASE_START_ADDRES)
-
-
-#define MAX_SIZE          256
-#define CQ_DEFAULT        0
-#define CHARACTER_OPTIONS 5
-
-/**
- * The empty string, follwed by 26 letter codes,
- * followed by the 10 numeral codes, followed by the comma,
- * period, and question mark.
- */
-char *morse_code_lookup_table[40] =
-  {
-    "", ".-","-...","-.-.","-..",".","..-.","--.","....","..",
-    ".---","-.-",".-..","--","-.","---",".--.","--.-",".-.",
-    "...","-","..-","...-",".--","-..-","-.--","--..","-----",
-    ".----","..---","...--","....-",".....","-....","--...",
-    "---..","----.","--..--","-.-.-.","..--.."
-  };
-
-typedef struct morse_character
-{
-  char character;
-  uint32_t millisec_time;
-  void (*action)(void);
-} morse_character;
-
-enum
-{
-  DotTimeInMilliSec                 = 500,
-  DashTimeInMilliSec                = 1500,
-  IntraCharacterSpaceTimeInMilliSec = 200,  // space between dots and dashes
-  InterCharacterSpaceTimeInMilliSec = 600,  // space between characters of a word
-  WordSpaceTimeInMilliSec           = 1400  // space between words
-};
 
 /**
  * A macro that is used to declare a new mutex that is visible in this file
@@ -82,11 +27,12 @@ static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
 static long         dev_ioctl(struct file *, unsigned int, unsigned long);
 static void         process_morse_code(unsigned long value);
 static void         process_morse_character(char character);
-static void         intra_character_space(unsigned long value);
 static inline char *ascii_to_morsecode(int asciicode);
 static void         convert_message_to_morsecode(char *message, size_t size);
 static void         turn_on_led(void);
 static void         turn_off_led(void);
+
+static *morse_character get_character(char character);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -102,22 +48,20 @@ static struct file_operations file_operations_t =
 };
 
 static const struct morse_character morse_table[] =
-  {
-    { '.', DotTimeInMilliSec, turn_on_led },
-    { '-', DashTimeInMilliSec, turn_on_led },
-    { ' ', IntraCharacterSpaceTimeInMilliSec, turn_off_led },
-    { '#', InterCharacterSpaceTimeInMilliSec, turn_off_led },
-    { '$', WordSpaceTimeInMilliSec, turn_off_led }
-  };
+{
+  { '.', DotTimeInMilliSec, turn_on_led },
+  { '-', DashTimeInMilliSec, turn_on_led },
+  { ' ', IntraCharacterSpaceTimeInMilliSec, turn_off_led },
+  { '#', InterCharacterSpaceTimeInMilliSec, turn_off_led },
+  { '$', WordSpaceTimeInMilliSec, turn_off_led }
+};
 
 /**
  * Device Drivers global variables
  */
-static struct timer_list timer;
-static char              morse_code[MAX_SIZE] = {0};
-static short             morse_code_length = 0;
-static short             morse_code_iterator = -1;
-static int               number_of_opens = 0;
+static struct timer_list   timer;
+static struct morse_device morse;
+static int                 number_of_opens = 0;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -171,12 +115,11 @@ static int __init morse_init(void)
   // Way to initialize a timer for older kernel version
   init_timer(&timer);
 
-  // do_div(DotTimeInJiffies, 1000);
-  // do_div(DashTimeInJiffies, 1000);
-  // do_div(IntraCharacterSpaceTimeInJiffies, 1000);
-  // do_div(InterCharacterSpaceTimeInJiffies, 1000);
-  // do_div(WordSpaceTimeInJiffies, 1000);
-
+  morse.message = { 0 };
+  morse.message_length = 0;
+  morse.iterator = -1;
+  morse.state = STATE_IDLE;
+ 
   return 0;
 }
 
@@ -289,6 +232,8 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   timer.function = process_morse_code;
   add_timer(&timer);
 
+  morse.state = STATE_BUSY;
+
   return size_of_message;
 }
 
@@ -302,39 +247,39 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   int j;
   char *morse_code_char;
 
-  morse_code_iterator = 0;
+  morse.iterator = 0;
 
   for(i = 0; i < message_size; i++)
   {
-    morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
+    morse_code_char = (char *)ascii_to_morsecode((int)morse.message[i]);
 
     // ssize_t letter_length = strlen(morse_code_char);
     printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
 
     if(!strcmp(morse_code_char, ""))
     {
-      morse_code[morse_code_iterator - 1] = '$';
+      morse.message[morse.iterator - 1] = '$';
     }
     else
     {
       for(j = 0; j < strlen(morse_code_char); j++)
       {
-        morse_code[morse_code_iterator] = morse_code_char[j];
-        morse_code_iterator++;
-        morse_code[morse_code_iterator] = ' ';
-        morse_code_iterator++;
+        morse.message[morse.iterator] = morse_code_char[j];
+        morse.iterator++;
+        morse.message[morse.iterator] = ' ';
+        morse.iterator++;
       }
 
-      morse_code[morse_code_iterator - 1] = '#';
+      morse.message[morse.iterator - 1] = '#';
     }
   }
 
-  morse_code[morse_code_iterator - 1] = '\0';
-  morse_code_length = strlen(morse_code);
-  morse_code_iterator = 0;
+  morse.message[morse.iterator - 1] = '\0';
+  morse.message_length = strlen(morse.message);
+  morse.iterator = 0;
 
-  printk(KERN_INFO "MorseCode: Morse Message %s\n", morse_code);
-  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse_code_length);
+  printk(KERN_INFO "MorseCode: Morse Message %s\n", morse.message);
+  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.length);
 }
 
 void process_morse_character(char character)
@@ -369,7 +314,6 @@ void process_morse_character(char character)
   add_timer(&timer);
 }
 
-
 /**
  * Allows the user to set mode of the driver
  */
@@ -378,70 +322,21 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
-// static void intra_character_space(unsigned long value)
-// {
-//   printk(KERN_INFO "MorseCode: Space Between Dots and Dashes\n");
-
-//   turn_off_led();
-
-//   timer.expires += IntraCharacterSpaceTimeInJiffies;
-//   timer.function = process_morse_code;
-//   add_timer(&timer);
-// }
-
 static void process_morse_code(unsigned long value)
 {
-  if(morse_code_iterator >= morse_code_length)
+  char current_character;
+
+  if(morse.iterator >= morse.length)
   {
+    morse.state = STATE_DONE;
     return;
   }
 
-  char current_character = morse_code[morse_code_iterator];
+  current_character = morse.message[morse.iterator];
 
   process_morse_character(current_character);
 
-  morse_code_iterator++;
-
-  // if(current_character == '.')
-  // {
-  //   printk(KERN_INFO "MorseCode: Dot\n");
-
-  //   turn_on_led();
-
-  //   timer.expires += DotTimeInJiffies;
-  //   timer.function = intra_character_space;
-  //   add_timer(&timer);
-  // }
-  // else if(current_character == '-')
-  // {
-  //   printk(KERN_INFO "MorseCode: Dash\n");
-
-  //   turn_on_led();
-
-  //   timer.expires += DashTimeInJiffies;
-  //   timer.function = intra_character_space;
-  //   add_timer(&timer);
-  // }
-  // else if(current_character == '#')
-  // {
-  //   printk(KERN_INFO "MorseCode: Between Letters\n");
-
-  //   turn_off_led();
-
-  //   timer.expires += InterCharacterSpaceTimeInJiffies;
-  //   timer.function = process_morse_code;
-  //   add_timer(&timer);
-  // }
-  // else if(current_character == '$')
-  // {
-  //   printk(KERN_INFO "MorseCode: Between Word\n");
-
-  //   turn_off_led();
-
-  //   timer.expires += WordSpaceTimeInJiffies;
-  //   timer.function = process_morse_code;
-  //   add_timer(&timer);
-  // }
+  morse.iterator++;
 }
 
 /**
