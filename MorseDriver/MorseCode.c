@@ -345,14 +345,16 @@ void process_morse_character(char character)
 
   current_character = morse_table;
 
+  printk(KERN_INFO "MorseCode: Before Loop\n");
   for(i = 0; i < 5; i++)
   {
     if(current_character->character == character)
     {
       break;
     }
-    current++;
+    current_character++;
   }
+  printk(KERN_INFO "MorseCode: After Loop\n");
 
   current_character->action();
 
