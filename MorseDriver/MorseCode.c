@@ -331,8 +331,11 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
 void process_morse_character(char character)
 {
   int i;
-  struct morse_character *current_character = morse_table;
-  
+  struct morse_character *current_character;
+  uint64_t jiffies;
+
+  current_character = morse_table;
+
   for(i = 0; i < 5; i++)
   {
     if(current_character->character == character)
@@ -342,16 +345,17 @@ void process_morse_character(char character)
     current++;
   }
 
-  current->action();
+  // current_character->action();
 
-  uint64_t jiffies = current->millisec_time * HZ;
+  jiffies = current_character->millisec_time * HZ;
   do_div(jiffies, 1000);
 
   printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current_character->character);
+  printk(KERN_INFO "MorseCode: Current Morse Jiffies = %lld\n", jiffies);
 
-  timer.expires += jiffies;
-  timer.function = process_morse_code;
-  add_timer(&timer);
+  // timer.expires += jiffies;
+  // timer.function = process_morse_code;
+  // add_timer(&timer);
 }
 
 
