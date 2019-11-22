@@ -17,7 +17,7 @@ static DEFINE_MUTEX(morse_mutex);
 
 static int            major_number;        ///< Stores the device number -- determined automatically
 static struct class  *morse_class = NULL;  ///< The device-driver class struct pointer
-static struct device *morse_device = NULL; ///< The device-driver device struct pointer
+static struct device *morse_device; ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
 static int          dev_open(struct inode *, struct file *);
@@ -32,7 +32,7 @@ static void         convert_message_to_morsecode(char *message, size_t size);
 static void         turn_on_led(void);
 static void         turn_off_led(void);
 
-static *morse_character get_character(char character);
+static morse_character * get_character(char character);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -59,9 +59,9 @@ static const struct morse_character morse_table[] =
 /**
  * Device Drivers global variables
  */
-static struct timer_list   timer;
-static struct morse_device morse;
-static int                 number_of_opens = 0;
+static struct timer_list        timer;
+static struct morse_code_device morse;
+static uint8_t                  number_of_opens = 0;
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -115,7 +115,12 @@ static int __init morse_init(void)
   // Way to initialize a timer for older kernel version
   init_timer(&timer);
 
-  morse.message = { 0 };
+  int i;
+  for(i = 0; i < MAX_SIZE; i++)
+  {
+    morse.message[i] = 0;
+  }
+
   morse.message_length = 0;
   morse.iterator = -1;
   morse.state = STATE_IDLE;
@@ -251,7 +256,7 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
 
   for(i = 0; i < message_size; i++)
   {
-    morse_code_char = (char *)ascii_to_morsecode((int)morse.message[i]);
+    morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
 
     // ssize_t letter_length = strlen(morse_code_char);
     printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
@@ -279,19 +284,17 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   morse.iterator = 0;
 
   printk(KERN_INFO "MorseCode: Morse Message %s\n", morse.message);
-  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.length);
+  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.message_length);
 }
 
-void process_morse_character(char character)
+static morse_character * get_character(char character)
 {
   int i;
   struct morse_character *current_character;
-  uint64_t jiffies;
 
   current_character = morse_table;
 
-  printk(KERN_INFO "MorseCode: Before Loop\n");
-  for(i = 0; i < 5; i++)
+  for(i = 0; i < CHARACTER_OPTIONS; i++)
   {
     if(current_character->character == character)
     {
@@ -299,7 +302,16 @@ void process_morse_character(char character)
     }
     current_character++;
   }
-  printk(KERN_INFO "MorseCode: After Loop\n");
+
+  return current_character;
+}
+
+static void process_morse_character(char character)
+{
+  struct morse_character *current_character;
+  uint64_t jiffies;
+
+  current_character = get_character(character);
 
   current_character->action();
 
@@ -326,8 +338,9 @@ static void process_morse_code(unsigned long value)
 {
   char current_character;
 
-  if(morse.iterator >= morse.length)
+  if(morse.iterator >= morse.message_length)
   {
+    turn_off_led();
     morse.state = STATE_DONE;
     return;
   }
