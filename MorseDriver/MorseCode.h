@@ -38,13 +38,13 @@ typedef struct morse_character
   void     (*action)(void);
 } morse_character;
 
-typedef struct morse_device
+typedef struct morse_code_device
 {
   char    message[MAX_SIZE];
   uint8_t message_length;
   uint8_t iterator;
   uint8_t state;
-} morse_device;
+} morse_code_device;
 
 enum
 {
