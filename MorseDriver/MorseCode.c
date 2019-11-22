@@ -20,19 +20,19 @@ static struct class  *morse_class = NULL;  ///< The device-driver class struct p
 static struct device *morse_device; ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
-static int          dev_open(struct inode *, struct file *);
-static int          dev_release(struct inode *, struct file *);
-static ssize_t      dev_read(struct file *, char *, size_t, loff_t *);
-static ssize_t      dev_write(struct file *, const char *, size_t, loff_t *);
-static long         dev_ioctl(struct file *, unsigned int, unsigned long);
-static void         process_morse_code(unsigned long value);
-static void         process_morse_character(char character);
-static inline char *ascii_to_morsecode(int asciicode);
-static void         convert_message_to_morsecode(char *message, size_t size);
-static void         turn_on_led(void);
-static void         turn_off_led(void);
-
-static morse_character * get_character(char character);
+static int                    dev_open(struct inode *, struct file *);
+static int                    dev_release(struct inode *, struct file *);
+static ssize_t                dev_read(struct file *, char *, size_t, loff_t *);
+static ssize_t                dev_write(struct file *, const char *, size_t, loff_t *);
+static long                   dev_ioctl(struct file *, unsigned int, unsigned long);
+static void                   process_morse_code_message(unsigned long value);
+static void                   process_morse_character(char character);
+static inline char *          ascii_to_morsecode(int asciicode);
+static void                   convert_message_to_morsecode(char *message, size_t size);
+static void                   turn_on_led(void);
+static void                   turn_off_led(void);
+static void                   set_display_time(morse_character_data *character_data);
+static morse_character_data * get_character_data(char character);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -47,7 +47,7 @@ static struct file_operations file_operations_t =
   .unlocked_ioctl = dev_ioctl
 };
 
-static const struct morse_character morse_table[] =
+static const struct morse_character_data morse_table[] =
 {
   { '.', DotTimeInMilliSec, turn_on_led },
   { '-', DashTimeInMilliSec, turn_on_led },
@@ -128,6 +128,9 @@ static int __init morse_init(void)
   return 0;
 }
 
+/**
+ * Turns LED0 ON using the physical address.
+ */
 static void turn_on_led(void)
 {
   // Get the virtual memory from the physical memory
@@ -140,6 +143,9 @@ static void turn_on_led(void)
   *set_data = *set_data | USR0_LED;
 }
 
+/**
+ * Turns LED0 OFF using the physical address.
+ */
 static void turn_off_led(void)
 {
   // Get the virtual memory from the physical memory
@@ -182,10 +188,17 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
-  // Releases the mutex (i.e., the lock goes up)
-  mutex_unlock(&morse_mutex);
+  if(morse.state == STATE_DONE)
+  {
+    // Releases the mutex (i.e., the lock goes up)
+    mutex_unlock(&morse_mutex);
 
-  return 0;   // Sucessfully released
+    return 0;
+  }
+  else
+  {
+    return -1;  //The message is being sent
+  }
 }
 
 /** @brief This function is called whenever device is being read from user space i.e. data is
@@ -234,12 +247,20 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   // Add the callback function to timer to start displaying morse code
   timer.expires = jiffies;
   timer.data = (unsigned long)NULL;
-  timer.function = process_morse_code;
+  timer.function = process_morse_code_message;
   add_timer(&timer);
 
   morse.state = STATE_BUSY;
 
   return size_of_message;
+}
+
+/**
+ * Allows the user to set mode of the driver
+ */
+static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
+{
+  return 0;
 }
 
 /** @brief Converts the message writen by the user to morse code string.
@@ -287,10 +308,10 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.message_length);
 }
 
-static morse_character * get_character(char character)
+static morse_character_data * get_character_data(char character)
 {
   int i;
-  struct morse_character *current_character;
+  struct morse_character_data *current_character;
 
   current_character = morse_table;
 
@@ -306,37 +327,32 @@ static morse_character * get_character(char character)
   return current_character;
 }
 
-static void process_morse_character(char character)
+static void set_display_time(morse_character_data *character_data)
 {
-  struct morse_character *current_character;
   uint64_t jiffies;
-
-  current_character = get_character(character);
-
-  current_character->action();
-
-  jiffies = current_character->millisec_time * HZ;
+  jiffies = character_data->millisec_time * HZ;
   do_div(jiffies, 1000);
 
-  printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current_character->character);
+  printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", character_data->character);
   printk(KERN_INFO "MorseCode: Current Morse Jiffies = %lld\n", jiffies);
 
   timer.expires += jiffies;
-  timer.function = process_morse_code;
+  timer.function = process_morse_code_message;
   add_timer(&timer);
 }
 
-/**
- * Allows the user to set mode of the driver
- */
-static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
+static void process_morse_character(char character)
 {
-  return 0;
+  struct morse_character_data *character_data;
+  character_data = get_character_data(character);
+
+  set_display_time(character_data);
+  character_data->display();
 }
 
-static void process_morse_code(unsigned long value)
+static void process_morse_code_message(unsigned long value)
 {
-  char current_character;
+  char current_morse_character;
 
   if(morse.iterator >= morse.message_length)
   {
@@ -345,9 +361,9 @@ static void process_morse_code(unsigned long value)
     return;
   }
 
-  current_character = morse.message[morse.iterator];
+  current_morse_character = morse.message[morse.iterator];
 
-  process_morse_character(current_character);
+  process_morse_character(current_morse_character);
 
   morse.iterator++;
 }
