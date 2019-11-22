@@ -25,14 +25,15 @@ static int                    dev_release(struct inode *, struct file *);
 static ssize_t                dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t                dev_write(struct file *, const char *, size_t, loff_t *);
 static long                   dev_ioctl(struct file *, unsigned int, unsigned long);
-static void                   process_morse_code_message(unsigned long value);
-static void                   process_morse_character(char character);
+static void                   display_morse_code_message(unsigned long value);
+static void                   display_morse_code_character(char character);
 static inline char *          ascii_to_morsecode(int asciicode);
 static void                   convert_message_to_morsecode(char *message, size_t size);
 static void                   turn_on_led(void);
 static void                   turn_off_led(void);
 static void                   set_display_time(morse_character_data *character_data);
 static morse_character_data * get_character_data(char character);
+static uint8_t                done_displaying_message(void);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
@@ -128,36 +129,6 @@ static int __init morse_init(void)
   return 0;
 }
 
-/**
- * Turns LED0 ON using the physical address.
- */
-static void turn_on_led(void)
-{
-  // Get the virtual memory from the physical memory
-  volatile void *gpio1_address;
-  unsigned long *set_data;
-
-  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
-  set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
-
-  *set_data = *set_data | USR0_LED;
-}
-
-/**
- * Turns LED0 OFF using the physical address.
- */
-static void turn_off_led(void)
-{
-  // Get the virtual memory from the physical memory
-  volatile void *gpio1_address;
-  unsigned long *clear_data;
-
-  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
-  clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
-
-  *clear_data = *clear_data | USR0_LED;
-}
-
 /** @brief The device open function that is called each time the device is opened
  *  This will only increment the numberOpens counter in this case.
  *  @param inode_ptr A pointer to an inode object (defined in linux/fs.h)
@@ -247,7 +218,7 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   // Add the callback function to timer to start displaying morse code
   timer.expires = jiffies;
   timer.data = (unsigned long)NULL;
-  timer.function = process_morse_code_message;
+  timer.function = display_morse_code_message;
   add_timer(&timer);
 
   morse.state = STATE_BUSY;
@@ -261,6 +232,36 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
 {
   return 0;
+}
+
+/**
+ * Turns LED0 ON using the physical address.
+ */
+static void turn_on_led(void)
+{
+  // Get the virtual memory from the physical memory
+  volatile void *gpio1_address;
+  unsigned long *set_data;
+
+  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
+  set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
+
+  *set_data = *set_data | USR0_LED;
+}
+
+/**
+ * Turns LED0 OFF using the physical address.
+ */
+static void turn_off_led(void)
+{
+  // Get the virtual memory from the physical memory
+  volatile void *gpio1_address;
+  unsigned long *clear_data;
+
+  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
+  clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
+
+  *clear_data = *clear_data | USR0_LED;
 }
 
 /** @brief Converts the message writen by the user to morse code string.
@@ -308,6 +309,10 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.message_length);
 }
 
+/** @brief Converts the message writen by the user to morse code string.
+ *  @param message The message writen by the user
+ *  @param message_size The size of the message
+ */
 static morse_character_data * get_character_data(char character)
 {
   int i;
@@ -327,6 +332,9 @@ static morse_character_data * get_character_data(char character)
   return current_character;
 }
 
+/** @brief Sets the time that a character will be shown.
+ * 
+ */
 static void set_display_time(morse_character_data *character_data)
 {
   uint64_t jiffies;
@@ -337,11 +345,14 @@ static void set_display_time(morse_character_data *character_data)
   printk(KERN_INFO "MorseCode: Current Morse Jiffies = %lld\n", jiffies);
 
   timer.expires += jiffies;
-  timer.function = process_morse_code_message;
+  timer.function = display_morse_code_message;
   add_timer(&timer);
 }
 
-static void process_morse_character(char character)
+/** @brief Displays a morse character.
+ * 
+ */
+static void display_morse_code_character(char character)
 {
   struct morse_character_data *character_data;
   character_data = get_character_data(character);
@@ -350,11 +361,19 @@ static void process_morse_character(char character)
   character_data->display();
 }
 
-static void process_morse_code_message(unsigned long value)
+static uint8_t done_displaying_message();
+{
+  return morse.iterator >= morse.message_length;
+}
+
+
+/** @brief Displays a morse code message.
+ */
+static void display_morse_code_message(unsigned long value)
 {
   char current_morse_character;
 
-  if(morse.iterator >= morse.message_length)
+  if(done_displaying_message())
   {
     turn_off_led();
     morse.state = STATE_DONE;
@@ -363,7 +382,7 @@ static void process_morse_code_message(unsigned long value)
 
   current_morse_character = morse.message[morse.iterator];
 
-  process_morse_character(current_morse_character);
+  display_morse_code_character(current_morse_character);
 
   morse.iterator++;
 }
