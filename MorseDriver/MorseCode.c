@@ -183,8 +183,11 @@ static int __init morse_init(void)
 static void turn_on_led(void)
 {
   // Get the virtual memory from the physical memory
-  volatile void *gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
-  unsigned long *set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
+  volatile void *gpio1_address;
+  unsigned long *set_data;
+
+  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
+  set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
 
   *set_data = *set_data | USR0_LED;
 }
@@ -192,8 +195,11 @@ static void turn_on_led(void)
 static void turn_off_led(void)
 {
   // Get the virtual memory from the physical memory
-  volatile void *gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
-  unsigned long *clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
+  volatile void *gpio1_address;
+  unsigned long *clear_data;
+
+  gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
+  clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
 
   *clear_data = *clear_data | USR0_LED;
 }
@@ -294,11 +300,14 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
 {
   int i;
   int j;
+  char *morse_code_char;
+
   morse_code_iterator = 0;
 
   for(i = 0; i < message_size; i++)
   {
-    char *morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
+    morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
+
     // ssize_t letter_length = strlen(morse_code_char);
     printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
 
@@ -345,7 +354,7 @@ void process_morse_character(char character)
     current++;
   }
 
-  // current_character->action();
+  current_character->action();
 
   jiffies = current_character->millisec_time * HZ;
   do_div(jiffies, 1000);
@@ -353,9 +362,9 @@ void process_morse_character(char character)
   printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current_character->character);
   printk(KERN_INFO "MorseCode: Current Morse Jiffies = %lld\n", jiffies);
 
-  // timer.expires += jiffies;
-  // timer.function = process_morse_code;
-  // add_timer(&timer);
+  timer.expires += jiffies;
+  timer.function = process_morse_code;
+  add_timer(&timer);
 }
 
 
