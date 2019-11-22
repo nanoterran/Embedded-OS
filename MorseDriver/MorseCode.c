@@ -50,7 +50,7 @@ char *morse_code_lookup_table[40] =
 typedef struct morse_character
 {
   char character;
-  uint32_t jiffies;
+  uint32_t millisec_time;
   void (*action)(void);
 } morse_character;
 
@@ -342,16 +342,16 @@ void process_morse_character(char character)
     current++;
   }
 
-  // current->action();
+  current->action();
 
-  // uint64_t jiffies = current->jiffies * HZ;
-  // do_div(jiffies, 1000);
+  uint64_t jiffies = current->millisec_time * HZ;
+  do_div(jiffies, 1000);
 
   printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", current_character->character);
 
-  // timer.expires += jiffies;
-  // timer.function = process_morse_code;
-  // add_timer(&timer);
+  timer.expires += jiffies;
+  timer.function = process_morse_code;
+  add_timer(&timer);
 }
 
 
