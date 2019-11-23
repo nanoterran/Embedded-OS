@@ -15,29 +15,38 @@ MODULE_VERSION("1.0");
  */
 static DEFINE_MUTEX(morse_mutex);
 
-static int            major_number;        ///< Stores the device number -- determined automatically
-static struct class  *morse_class = NULL;  ///< The device-driver class struct pointer
-static struct device *morse_device; ///< The device-driver device struct pointer
+/**
+ *  Declaration of variables for registering the device driver
+ */
+static int            major_number;
+static struct class  *morse_class = NULL;
+static struct device *morse_device;
 
-// The prototype functions for the character driver -- must come before the struct definition
-static int                    dev_open(struct inode *, struct file *);
-static int                    dev_release(struct inode *, struct file *);
-static ssize_t                dev_read(struct file *, char *, size_t, loff_t *);
-static ssize_t                dev_write(struct file *, const char *, size_t, loff_t *);
-static long                   dev_ioctl(struct file *, unsigned int, unsigned long);
-static void                   display_morse_code_message(unsigned long value);
-static void                   display_morse_code_character(char character);
-static inline char *          ascii_to_morsecode(int asciicode);
-static void                   convert_message_to_morsecode(char *message, size_t size);
-static void                   turn_on_led(void);
-static void                   turn_off_led(void);
-static void                   set_display_time(morse_character_data *character_data);
+/**
+ * The prototype functions for the character driver.
+ * Note: It must come before the struct definition
+ */
+static int           dev_open(struct inode *, struct file *);
+static int           dev_release(struct inode *, struct file *);
+static ssize_t       dev_read(struct file *, char *, size_t, loff_t *);
+static ssize_t       dev_write(struct file *, const char *, size_t, loff_t *);
+static long          dev_ioctl(struct file *, unsigned int, unsigned long);
+static void          display_morse_code_message(unsigned long value);
+static void          display_morse_code_character(char character);
+static inline char * ascii_to_morsecode(int asciicode);
+static void          convert_message_to_morsecode(char *message, size_t size);
+static void          turn_on_led(void);
+static void          turn_off_led(void);
+static void          set_display_time(morse_character_data *character_data);
+static uint8_t       done_displaying_message(void);
+
 static morse_character_data * get_character_data(char character);
-static uint8_t                done_displaying_message(void);
 
-/** @brief Devices are represented as file structure in the kernel. The file_operations structure 
- *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
- *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
+/** @brief Devices are represented as file structure in the kernel.
+ *  The file_operations structure from /linux/fs.h lists the callback functions
+ *  that you wish to associated with your file operations using a C99 syntax
+ *  structure. char devices usually implement open, read, write and release
+ *  calls
  */
 static struct file_operations file_operations_t =
 {
@@ -48,6 +57,10 @@ static struct file_operations file_operations_t =
   .unlocked_ioctl = dev_ioctl
 };
 
+static struct timer_list        timer;
+static struct morse_code_device morse;
+static uint8_t                  number_of_opens = 0;
+
 static const struct morse_character_data morse_table[] =
 {
   { '.', DotTimeInMilliSec, turn_on_led },
@@ -57,24 +70,19 @@ static const struct morse_character_data morse_table[] =
   { '$', WordSpaceTimeInMilliSec, turn_off_led }
 };
 
-/**
- * Device Drivers global variables
- */
-static struct timer_list        timer;
-static struct morse_code_device morse;
-static uint8_t                  number_of_opens = 0;
-
 /** @brief The LKM initialization function
- *  The static keyword restricts the visibility of the function to within this C file. The __init
- *  macro means that for a built-in driver (not a LKM) the function is only used at initialization
- *  time and that it can be discarded and its memory freed up after that point.
+ *  The static keyword restricts the visibility of the function to within
+ *  this C file. The __init macro means that for a built-in driver (not a LKM)
+ *  the function is only used at initialization time and that it can be 
+ *  discarded and its memory freed up after that point.
  *  @return returns 0 if successful
  */
 static int __init morse_init(void)
 {
   printk(KERN_INFO "MorseCode: Initializing the MorseCode LKM\n");
 
-  // Try to dynamically allocate a major number for the device -- more difficult but worth it
+  // Try to dynamically allocate a major number for the device
+  // Note: This is more difficult but worth it
   major_number = register_chrdev(0, DEVICE_NAME, &file_operations_t);
   if(major_number < 0)
   {
@@ -82,7 +90,7 @@ static int __init morse_init(void)
 
     return major_number;
   }
-  printk(KERN_INFO "MorseCode: registered correctly with major number %d\n", major_number);
+  printk(KERN_INFO "MorseCode: Registerd Correctrly %d\n", major_number);
 
   // Register the device class
   morse_class = class_create(THIS_MODULE, CLASS_NAME);
@@ -98,6 +106,7 @@ static int __init morse_init(void)
 
   // Register the device driver
   morse_device = device_create(morse_class, NULL, MKDEV(major_number, 0), NULL, DEVICE_NAME);
+
   if (IS_ERR(morse_device))
   {
     // Repeated code but the alternative is goto statements
@@ -129,8 +138,8 @@ static int __init morse_init(void)
   return 0;
 }
 
-/** @brief The device open function that is called each time the device is opened
- *  This will only increment the numberOpens counter in this case.
+/** @brief The device open function that is called each time the device is 
+ *  opened. This will only increment the numberOpens counter in this case.
  *  @param inode_ptr A pointer to an inode object (defined in linux/fs.h)
  *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
  */
@@ -152,8 +161,8 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
   return 0;   // Successfully opened opened
 }
 
-/** @brief The device release function that is called whenever the device is closed/released by
- *  the userspace program
+/** @brief The device release function that is called whenever the device is 
+ *  closed/released by the userspace program.
  *  @param inode_ptr A pointer to an inode object (defined in linux/fs.h)
  *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
  */
@@ -172,11 +181,12 @@ static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
   }
 }
 
-/** @brief This function is called whenever device is being read from user space i.e. data is
- *  being sent from the device to the user. In this case is uses the copy_to_user() function to
- *  send the buffer string to the user and captures any errors.
+/** @brief This function is called whenever device is being read from
+ *  user space i.e. data is being sent from the device to the user.
+ *  In this case is uses the copy_to_user() function to send the buffer string
+ *  to the user and captures any errors.
  *  @param file_ptr A pointer to a file object (defined in linux/fs.h)
- *  @param user_buffer The pointer to the buffer to which this function writes the data
+ *  @param user_buffer The pointer to the buffer to write the data
  *  @param buffer_size The length of the b
  *  @param offset_ptr The offset if required
  */
@@ -185,12 +195,13 @@ static ssize_t dev_read(struct file *file_ptr, char *user_buffer, size_t buffer_
   return 0;
 }
 
-/** @brief This function is called whenever the device is being written to from user space i.e.
- *  data is sent to the device from the user. The data is copied to the message[] array in this
- *  LKM using the copy_from_user() function along with the length of the string.
+/** @brief This function is called whenever the device is being written
+ *  to from user space i.e. data is sent to the device from the user.
+ *  The data is copied to the message[] array in this LKM using the 
+ *  copy_from_user() function along with the length of the string.
  *  @param file_ptr A pointer to a file object
- *  @param user_buffer The buffer to that contains the string to write to the device
- *  @param buffer_size The length of the array of data that is being passed in the const char buffer
+ *  @param user_buffer The buffer with string from the user program
+ *  @param buffer_size The length of the user program buffer
  *  @param offset_ptr The offset if required
  */
 static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t buffer_size, loff_t *offset_ptr)
@@ -203,7 +214,7 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   {
     return -1;
   }
-  printk(KERN_INFO "MorseCode: Received %lu characters from the user\n", buffer_size);
+  printk(KERN_INFO "MorseCode: Received %lu characters from user\n", buffer_size);
 
   bytes_not_copied = copy_from_user(message, user_buffer, buffer_size);
   if(bytes_not_copied > 0)
@@ -234,9 +245,6 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
-/**
- * Turns LED0 ON using the physical address.
- */
 static void turn_on_led(void)
 {
   // Get the virtual memory from the physical memory
@@ -249,9 +257,6 @@ static void turn_on_led(void)
   *set_data = *set_data | USR0_LED;
 }
 
-/**
- * Turns LED0 OFF using the physical address.
- */
 static void turn_off_led(void)
 {
   // Get the virtual memory from the physical memory
@@ -264,10 +269,6 @@ static void turn_off_led(void)
   *clear_data = *clear_data | USR0_LED;
 }
 
-/** @brief Converts the message writen by the user to morse code string.
- *  @param message The message writen by the user
- *  @param message_size The size of the message
- */
 static void convert_message_to_morsecode(char *message, size_t message_size)
 {
   int i;
@@ -280,7 +281,6 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   {
     morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
 
-    // ssize_t letter_length = strlen(morse_code_char);
     printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
 
     if(!strcmp(morse_code_char, ""))
@@ -306,13 +306,9 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   morse.iterator = 0;
 
   printk(KERN_INFO "MorseCode: Morse Message %s\n", morse.message);
-  printk(KERN_INFO "MorseCode: Morse Message Length %i\n", morse.message_length);
+  printk(KERN_INFO "MorseCode: Message Length %i\n", morse.message_length);
 }
 
-/** @brief Converts the message writen by the user to morse code string.
- *  @param message The message writen by the user
- *  @param message_size The size of the message
- */
 static morse_character_data * get_character_data(char character)
 {
   int i;
@@ -332,26 +328,20 @@ static morse_character_data * get_character_data(char character)
   return current_character;
 }
 
-/** @brief Sets the time that a character will be shown.
- * 
- */
 static void set_display_time(morse_character_data *character_data)
 {
   uint64_t jiffies;
   jiffies = character_data->millisec_time * HZ;
   do_div(jiffies, 1000);
 
-  printk(KERN_INFO "MorseCode: Current Morse Char = %c\n", character_data->character);
-  printk(KERN_INFO "MorseCode: Current Morse Jiffies = %lld\n", jiffies);
+  printk(KERN_INFO "MorseCode: Morse Char = %c\n", character_data->character);
+  printk(KERN_INFO "MorseCode: Morse Jiffies = %lld\n", jiffies);
 
   timer.expires += jiffies;
   timer.function = display_morse_code_message;
   add_timer(&timer);
 }
 
-/** @brief Displays a morse character.
- * 
- */
 static void display_morse_code_character(char character)
 {
   struct morse_character_data *character_data;
@@ -361,14 +351,11 @@ static void display_morse_code_character(char character)
   character_data->display();
 }
 
-static uint8_t done_displaying_message();
+static uint8_t done_displaying_message()
 {
   return morse.iterator >= morse.message_length;
 }
 
-
-/** @brief Displays a morse code message.
- */
 static void display_morse_code_message(unsigned long value)
 {
   char current_morse_character;
@@ -381,18 +368,13 @@ static void display_morse_code_message(unsigned long value)
   }
 
   current_morse_character = morse.message[morse.iterator];
-
   display_morse_code_character(current_morse_character);
-
   morse.iterator++;
 }
 
-/**
- * Maps the ascii value to its morse code string.
- */
 static inline char *ascii_to_morsecode(int asciicode)
 {
-   char *mc;   // this is the mapping from the ASCII code into the mcodearray of strings.
+   char *mc;
 
    if (asciicode > 122)  // Past 'z'
       mc = morse_code_lookup_table[CQ_DEFAULT];
@@ -414,20 +396,22 @@ static inline char *ascii_to_morsecode(int asciicode)
       mc = morse_code_lookup_table[37];   // 36 + 1
    else
       mc = morse_code_lookup_table[CQ_DEFAULT];
+
    return mc;
 }
 
 /** @brief The LKM cleanup function
- *  Similar to the initialization function, it is static. The __exit macro notifies that if this
- *  code is used for a built-in driver (not a LKM) that this function is not required.
+ *  Similar to the initialization function, it is static. The __exit macro 
+ *  notifies that if this code is used for a built-in driver (not a LKM) that 
+ *  this function is not required.
  */
 static void __exit morse_exit(void)
 {
-  device_destroy(morse_class, MKDEV(major_number, 0)); // remove the device
-  class_unregister(morse_class);                       // unregister the device class
-  class_destroy(morse_class);                          // remove the device class
-  unregister_chrdev(major_number, DEVICE_NAME);        // unregister the major number
-  mutex_destroy(&morse_mutex);                         // destroy the dynamically-allocated mutex
+  device_destroy(morse_class, MKDEV(major_number, 0));
+  class_unregister(morse_class);
+  class_destroy(morse_class);
+  unregister_chrdev(major_number, DEVICE_NAME);
+  mutex_destroy(&morse_mutex);
   del_timer(&timer);
 
   printk(KERN_INFO "MorseCode: Goodbye from the Morse Code Device Driver!\n");
