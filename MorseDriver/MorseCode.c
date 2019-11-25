@@ -8,15 +8,13 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("A Morse Code Driver support to blink USR0 LED.");
 MODULE_VERSION("1.0");
 
-/**
- * The prototype functions for the character driver.
- * Note: It must come before the struct definition
- */
+
 static int           dev_open(struct inode *, struct file *);
 static int           dev_release(struct inode *, struct file *);
 static ssize_t       dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t       dev_write(struct file *, const char *, size_t, loff_t *);
 static long          dev_ioctl(struct file *, unsigned int, unsigned long);
+
 static void          display_morse_code_message(unsigned long value);
 static void          display_morse_code_character(char character);
 static inline char * ascii_to_morsecode(int asciicode);
@@ -25,7 +23,7 @@ static void          turn_on_led(void);
 static void          turn_off_led(void);
 static void          set_display_time(uint32_t milli_seconds);
 static void          set_timer_callback(void);
-static void          set_timer_data();
+static void          set_timer_data(unsigned long data);
 static uint8_t       done_displaying_message(void);
 
 static morse_character_data * get_character_data(char character);
@@ -215,7 +213,7 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   convert_message_to_morsecode(message, size_of_message);
 
   set_display_time(SOONEST_POSSIBLE);
-  set_timer_data();
+  set_timer_data(NULL);
   set_timer_callback();
   add_timer(&timer);
 
@@ -259,9 +257,9 @@ static void set_timer_callback()
   timer.function = display_morse_code_message;
 }
 
-static void set_timmer_data()
+static void set_timmer_data(unsigned long data)
 {
-  timer.data = (unsigned long)NULL;
+  timer.data = data;
 }
 
 static void set_display_time(uint32_t milli_seconds)
