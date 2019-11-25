@@ -26,6 +26,7 @@
 #define MAX_SIZE          256
 #define CQ_DEFAULT        0
 #define CHARACTER_OPTIONS 5
+#define SOONEST_POSSIBLE  0
 
 #define STATE_BUSY 0
 #define STATE_DONE 1
