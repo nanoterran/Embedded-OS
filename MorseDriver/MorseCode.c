@@ -149,13 +149,8 @@ static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
   if(get_device_state() == STATE_DONE)
   {
     mutex_unlock(&morse_mutex);
-
-    return 0;
   }
-  else
-  {
-    return STATE_BUSY;
-  }
+  return 0;
 }
 
 /** @brief This function is called whenever device is being read from
@@ -357,6 +352,7 @@ static void display_morse_code_message(unsigned long value)
   {
     turn_off_led();
     set_device_state(STATE_DONE);
+    mutex_unlock(&morse_mutex);
     return;
   }
 
