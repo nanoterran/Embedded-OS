@@ -5,22 +5,8 @@
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("A character device driver for morse code.");
+MODULE_DESCRIPTION("A Morse Code Driver support to blink USR0 LED.");
 MODULE_VERSION("1.0");
-
-/**
- * A macro that is used to declare a new mutex that is visible in this file
- * results in a semaphore variable ebbchar_mutex with value 1 (unlocked)
- * DEFINE_MUTEX_LOCKED() results in a variable with value 0 (locked)
- */
-static DEFINE_MUTEX(morse_mutex);
-
-/**
- *  Declaration of variables for registering the device driver
- */
-static int            major_number;
-static struct class  *morse_class = NULL;
-static struct device *morse_device;
 
 /**
  * The prototype functions for the character driver.
@@ -37,17 +23,13 @@ static inline char * ascii_to_morsecode(int asciicode);
 static void          convert_message_to_morsecode(char *message, size_t size);
 static void          turn_on_led(void);
 static void          turn_off_led(void);
-static void          set_display_time(morse_character_data *character_data);
+static void          set_display_time(uint32_t milli_seconds);
+static void          set_timer_callback(void);
+static void          set_timer_data();
 static uint8_t       done_displaying_message(void);
 
 static morse_character_data * get_character_data(char character);
 
-/** @brief Devices are represented as file structure in the kernel.
- *  The file_operations structure from /linux/fs.h lists the callback functions
- *  that you wish to associated with your file operations using a C99 syntax
- *  structure. char devices usually implement open, read, write and release
- *  calls
- */
 static struct file_operations file_operations_t =
 {
   .open           = dev_open,
@@ -57,18 +39,24 @@ static struct file_operations file_operations_t =
   .unlocked_ioctl = dev_ioctl
 };
 
+static                          DEFINE_MUTEX(morse_mutex);
+static struct class            *morse_class = NULL;
+static struct device           *morse_device;
+static int                      major_number;
 static struct timer_list        timer;
 static struct morse_code_device morse;
 static uint8_t                  number_of_opens = 0;
 
 static const struct morse_character_data morse_table[] =
 {
-  { '.', DotTimeInMilliSec, turn_on_led },
-  { '-', DashTimeInMilliSec, turn_on_led },
+  { '.', DotTimeInMilliSec,                 turn_on_led },
+  { '-', DashTimeInMilliSec,                turn_on_led },
   { ' ', IntraCharacterSpaceTimeInMilliSec, turn_off_led },
   { '#', InterCharacterSpaceTimeInMilliSec, turn_off_led },
-  { '$', WordSpaceTimeInMilliSec, turn_off_led }
+  { '$', WordSpaceTimeInMilliSec,           turn_off_led }
 };
+
+
 
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within
@@ -226,10 +214,9 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
 
   convert_message_to_morsecode(message, size_of_message);
 
-  // Add the callback function to timer to start displaying morse code
-  timer.expires = jiffies;
-  timer.data = (unsigned long)NULL;
-  timer.function = display_morse_code_message;
+  set_display_time(SOONEST_POSSIBLE);
+  set_timer_data();
+  set_timer_callback();
   add_timer(&timer);
 
   morse.state = STATE_BUSY;
@@ -247,7 +234,6 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
 
 static void turn_on_led(void)
 {
-  // Get the virtual memory from the physical memory
   volatile void *gpio1_address;
   unsigned long *set_data;
 
@@ -259,7 +245,6 @@ static void turn_on_led(void)
 
 static void turn_off_led(void)
 {
-  // Get the virtual memory from the physical memory
   volatile void *gpio1_address;
   unsigned long *clear_data;
 
@@ -267,6 +252,32 @@ static void turn_off_led(void)
   clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
 
   *clear_data = *clear_data | USR0_LED;
+}
+
+static void set_timer_callback()
+{
+  timer.function = display_morse_code_message;
+}
+
+static void set_timmer_data()
+{
+  timer.data = (unsigned long)NULL;
+}
+
+static void set_display_time(uint32_t milli_seconds)
+{
+  uint64_t number_of_jiffies;
+
+  if(milli_seconds > 0)
+  {
+    number_of_jiffies = milli_seconds * HZ;
+    do_div(number_of_jiffies, 1000);
+    timer.expires += number_of_jiffies;
+  }
+  else
+  {
+    timer.expires = jiffies;
+  }
 }
 
 static void convert_message_to_morsecode(char *message, size_t message_size)
@@ -328,26 +339,14 @@ static morse_character_data * get_character_data(char character)
   return current_character;
 }
 
-static void set_display_time(morse_character_data *character_data)
-{
-  uint64_t jiffies;
-  jiffies = character_data->millisec_time * HZ;
-  do_div(jiffies, 1000);
-
-  printk(KERN_INFO "MorseCode: Morse Char = %c\n", character_data->character);
-  printk(KERN_INFO "MorseCode: Morse Jiffies = %lld\n", jiffies);
-
-  timer.expires += jiffies;
-  timer.function = display_morse_code_message;
-  add_timer(&timer);
-}
-
 static void display_morse_code_character(char character)
 {
   struct morse_character_data *character_data;
   character_data = get_character_data(character);
 
-  set_display_time(character_data);
+  set_timer_callback();
+  set_display_time(character_data->millisec_time);
+  add_timer(&timer);
   character_data->display();
 }
 
@@ -393,7 +392,7 @@ static inline char *ascii_to_morsecode(int asciicode)
    else if (asciicode == 46)  // Period
       mc = morse_code_lookup_table[38];  // 36 + 2 
    else if (asciicode == 44)  // Comma
-      mc = morse_code_lookup_table[37];   // 36 + 1
+      mc = morse_code_lookup_table[37];  // 36 + 1
    else
       mc = morse_code_lookup_table[CQ_DEFAULT];
 
