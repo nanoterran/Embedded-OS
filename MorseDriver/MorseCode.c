@@ -146,7 +146,8 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
-  if(get_device_state() == STATE_DONE)
+  uint8_t current_state = get_device_state();
+  if(current_state == STATE_DONE)
   {
     mutex_unlock(&morse_mutex);
   }
@@ -182,8 +183,16 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   char message[MAX_SIZE] = {0};
   int size_of_message = 0;
 
+  uint8_t current_state = get_device_state();
+  if(current_state == STATE_BUSY)
+  {
+    printk(KERN_INFO "MorseCode: Can't write while sending a message\n");
+    return -EBUSY;
+  }
+
   if(buffer_size <= 0)
   {
+    printk(KERN_INFO "MorseCode: No Data in the buffer\n");
     return -1;
   }
   printk(KERN_INFO "MorseCode: Received %lu characters from user\n", buffer_size);
@@ -199,12 +208,13 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   convert_message_to_morsecode(message, size_of_message);
 
   set_display_time(SOONEST_POSSIBLE);
-  set_timer_data(NULL);
+  set_timer_data(NO_DATA);
   set_timer_callback();
   add_timer(&timer);
 
   set_device_state(STATE_BUSY);
 
+  printk(KERN_INFO "MorseCode: Sending Morse Code Message\n");
   return size_of_message;
 }
 
@@ -214,6 +224,11 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
 {
   return 0;
+}
+
+static uint8_t get_device_state()
+{
+  return morse.state;
 }
 
 static void set_device_state(uint8_t state)
@@ -248,7 +263,7 @@ static void set_timer_callback()
   timer.function = display_morse_code_message;
 }
 
-static void set_timmer_data(unsigned long data)
+static void set_timer_data(unsigned long data)
 {
   timer.data = data;
 }
@@ -286,8 +301,6 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   {
     morse_code_char = (char *)ascii_to_morsecode((int)message[i]);
 
-    printk(KERN_INFO "MorseCode: Char =  %s\n", morse_code_char);
-
     if(!strcmp(morse_code_char, ""))
     {
       morse.message[morse.iterator - 1] = '$';
@@ -309,9 +322,6 @@ static void convert_message_to_morsecode(char *message, size_t message_size)
   morse.message[morse.iterator - 1] = '\0';
   morse.message_length = strlen(morse.message);
   morse.iterator = 0;
-
-  printk(KERN_INFO "MorseCode: Morse Message %s\n", morse.message);
-  printk(KERN_INFO "MorseCode: Message Length %i\n", morse.message_length);
 }
 
 static morse_character_data * get_character_data(char character)
@@ -353,6 +363,7 @@ static void display_morse_code_message(unsigned long value)
     turn_off_led();
     set_device_state(STATE_DONE);
     mutex_unlock(&morse_mutex);
+
     return;
   }
 
