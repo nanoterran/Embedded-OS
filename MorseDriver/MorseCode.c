@@ -47,7 +47,7 @@ static struct timer_list        timer;
 static struct morse_code_device morse;
 static uint8_t                  number_of_opens = 0;
 
-static const struct morse_character_data morse_table[] =
+static const struct morse_character_data morse_character_table[] =
 {
   { '.', DotTimeInMilliSec,                 turn_on_led },
   { '-', DashTimeInMilliSec,                turn_on_led },
@@ -69,8 +69,6 @@ static int __init morse_init(void)
 {
   printk(KERN_INFO "MorseCode: Initializing the MorseCode LKM\n");
 
-  // Try to dynamically allocate a major number for the device
-  // Note: This is more difficult but worth it
   major_number = register_chrdev(0, DEVICE_NAME, &file_operations_t);
   if(major_number < 0)
   {
@@ -80,7 +78,6 @@ static int __init morse_init(void)
   }
   printk(KERN_INFO "MorseCode: Registerd Correctrly %d\n", major_number);
 
-  // Register the device class
   morse_class = class_create(THIS_MODULE, CLASS_NAME);
   if(IS_ERR(morse_class))
   {
@@ -92,9 +89,7 @@ static int __init morse_init(void)
   }
   printk(KERN_INFO "MorseCode: device class registered correctly\n");
 
-  // Register the device driver
   morse_device = device_create(morse_class, NULL, MKDEV(major_number, 0), NULL, DEVICE_NAME);
-
   if (IS_ERR(morse_device))
   {
     // Repeated code but the alternative is goto statements
@@ -132,10 +127,6 @@ static int __init morse_init(void)
  */
 static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 {
-  /**
-   * Try to acquire the mutex (i.e., put the lock on/down)
-   * returns 1 if successful and 0 if there is contention
-   */
   if(!mutex_trylock(&morse_mutex)){
     printk(KERN_ALERT "MorseCode: Device in use by another process\n");
 
@@ -145,7 +136,7 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
 
   number_of_opens++;
 
-  return 0;   // Successfully opened opened
+  return 0;   // Successfully opened
 }
 
 /** @brief The device release function that is called whenever the device is 
@@ -333,7 +324,7 @@ static morse_character_data * get_character_data(char character)
   int i;
   struct morse_character_data *current_character;
 
-  current_character = morse_table;
+  current_character = morse_character_table;
 
   for(i = 0; i < CHARACTER_OPTIONS; i++)
   {
@@ -369,9 +360,8 @@ static void display_morse_code_message(unsigned long value)
     return;
   }
 
-  current_morse_character = morse.message[morse.iterator];
+  current_morse_character = morse.message[morse.iterator++];
   display_morse_code_character(current_morse_character);
-  morse.iterator++;
 }
 
 static inline char *ascii_to_morsecode(int asciicode)

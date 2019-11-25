@@ -70,4 +70,4 @@ char *morse_code_lookup_table[40] =
   "---..","----.","--..--","-.-.-.","..--.."
 };
 
-#endif MORSECODE_H
+#endif
