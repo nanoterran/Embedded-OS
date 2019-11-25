@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #define BUFFER_LENGTH 256
-const char driver_path = "/dev/MorseCode";
+const char *driver_path = "/dev/MorseCode";
 
 int main(void)
 {
