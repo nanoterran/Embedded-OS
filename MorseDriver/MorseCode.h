@@ -27,10 +27,11 @@
 #define CQ_DEFAULT        0
 #define CHARACTER_OPTIONS 5
 #define SOONEST_POSSIBLE  0
+#define NO_DATA           0
 
-#define STATE_BUSY -1
 #define STATE_DONE 0
-#define STATE_IDLE 1
+#define STATE_BUSY 1
+#define STATE_IDLE 2
 
 typedef struct morse_character_data
 {
