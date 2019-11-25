@@ -25,6 +25,8 @@ static void          set_display_time(uint32_t milli_seconds);
 static void          set_timer_callback(void);
 static void          set_timer_data(unsigned long data);
 static uint8_t       done_displaying_message(void);
+static void          set_device_state(uint8_t state);
+static uint8_t       get_device_state(void);
 
 static morse_character_data * get_character_data(char character);
 
@@ -105,7 +107,6 @@ static int __init morse_init(void)
   }
   printk(KERN_INFO "MorseCode: device class created correctly\n");
 
-  // Initialize the mutex lock dynamically at runtime
   mutex_init(&morse_mutex);
 
   // Way to initialize a timer for older kernel version
@@ -119,7 +120,7 @@ static int __init morse_init(void)
 
   morse.message_length = 0;
   morse.iterator = -1;
-  morse.state = STATE_IDLE;
+  set_device_state(STATE_IDLE);
  
   return 0;
 }
@@ -154,16 +155,15 @@ static int dev_open(struct inode *inode_ptr, struct file *file_ptr)
  */
 static int dev_release(struct inode *inode_ptr, struct file *file_ptr)
 {
-  if(morse.state == STATE_DONE)
+  if(get_device_state() == STATE_DONE)
   {
-    // Releases the mutex (i.e., the lock goes up)
     mutex_unlock(&morse_mutex);
 
     return 0;
   }
   else
   {
-    return -1;  //The message is being sent
+    return STATE_BUSY;
   }
 }
 
@@ -217,7 +217,7 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
   set_timer_callback();
   add_timer(&timer);
 
-  morse.state = STATE_BUSY;
+  set_device_state(STATE_BUSY);
 
   return size_of_message;
 }
@@ -228,6 +228,11 @@ static ssize_t dev_write(struct file *file_ptr, const char *user_buffer, size_t 
 static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long arg)
 {
   return 0;
+}
+
+static void set_device_state(uint8_t state)
+{
+  morse.state = state;
 }
 
 static void turn_on_led(void)
@@ -276,6 +281,11 @@ static void set_display_time(uint32_t milli_seconds)
   {
     timer.expires = jiffies;
   }
+}
+
+static uint8_t done_displaying_message()
+{
+  return morse.iterator >= morse.message_length;
 }
 
 static void convert_message_to_morsecode(char *message, size_t message_size)
@@ -348,11 +358,6 @@ static void display_morse_code_character(char character)
   character_data->display();
 }
 
-static uint8_t done_displaying_message()
-{
-  return morse.iterator >= morse.message_length;
-}
-
 static void display_morse_code_message(unsigned long value)
 {
   char current_morse_character;
@@ -360,7 +365,7 @@ static void display_morse_code_message(unsigned long value)
   if(done_displaying_message())
   {
     turn_off_led();
-    morse.state = STATE_DONE;
+    set_device_state(STATE_DONE);
     return;
   }
 
