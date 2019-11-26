@@ -57,7 +57,6 @@ static const struct morse_character_data morse_character_table[] =
 };
 
 
-
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within
  *  this C file. The __init macro means that for a built-in driver (not a LKM)
@@ -351,23 +350,26 @@ static void display_morse_code_character(char character)
   set_timer_callback();
   set_display_time(character_data->millisec_time);
   add_timer(&timer);
+
+  printk(KERN_INFO "MorseCode: %c\n", character);
+  
   character_data->display();
 }
 
 static void display_morse_code_message(unsigned long value)
 {
-  char current_morse_character;
-
   if(done_displaying_message())
   {
     turn_off_led();
     set_device_state(STATE_DONE);
     mutex_unlock(&morse_mutex);
 
+    printk(KERN_INFO "MorseCode: Done Sending Morse Code Message\n");
+
     return;
   }
 
-  current_morse_character = morse.message[morse.iterator++];
+  char current_morse_character = morse.message[morse.iterator++];
   display_morse_code_character(current_morse_character);
 }
 
