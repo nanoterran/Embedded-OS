@@ -1,0 +1,15 @@
+﻿Part 2 – Prepare the Device Driver
+    (a) From the top-level of the Linux source code directory, change directory into 
+       (top-level linux source dir)/drivers/char/, create a new directory called motor, and then add the driver source code motor1.c
+    (b) Next, we need to modify the Kconfig at (top-level linux source dir)/drivers/char/ so that we can select our device driver when compiling the Linux Kernel. Add the following:
+           config MOTOR
+               tristate “Motor”
+       		default M
+       		help
+       			Select this option if you have a motor in your system.
+    (c) After modifying the Kconfig, we need to modify the Makefile at 
+       (top-level linux source dir)/drivers/char/ so that it finds the Makefile for our device driver and compiles it. Add the following:
+       obj-$(CONFIG_MOTOR) += motor/
+    (d) To compile our Motor Device Driver we need to create a new Makefile in the directory where our Motor Device Driver is located, which is (top-level linux source dir)/drivers/char/motor. In the Makefile add: obj-$(CONFIG_MOTOR) += motor1.o. If you want to build once the kernel is compiled we can select it using the configuration, this is done by running the command  make ARCH=arm CROSS_COMPILE=<compiler for your architecture> gconfig. Once we have the gconfig window you can select the Motor driver under Device Drivers > Character devices > Morse. By default we have made it so that it can be dynamically loaded after the kernel has been built. If you want to build the driver with the kernel set the option to Y.
+    (e) 
+
