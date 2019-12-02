@@ -209,6 +209,33 @@ static long motor_ioctl(struct file *file_ptr, unsigned int command, unsigned lo
   return 0;
 }
 
+static ssize_t motor_stop(struct file *file_ptr)
+{
+  // Code that will handle stoping the motor
+
+  return 0;
+}
+
+static ssize_t motor_rotate(struct file *file_ptr, int direction)
+{
+  switch (direction)
+  {
+    case ROTATE_LEFT:
+      /* Handle rotate left for motor */
+      printk(KERN_INFO "Motor: Rotating to the Right\n");
+      break;
+    case ROTATE_RIGHT:
+      /* Hanlde rotate right for motor */
+      printk(KERN_INFO "Motor: Rotating to the Left\n");
+      break;
+    default:
+      printk(KERN_INFO "Motor: Invalid direction\n");
+      break;
+  }
+
+  return 0;
+}
+
 /** @brief The LKM cleanup function
  *  Similar to the initialization function, it is static. The __exit macro 
  *  notifies that if this code is used for a built-in driver (not a LKM) that 
