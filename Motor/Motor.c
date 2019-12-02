@@ -190,8 +190,22 @@ static long motor_ioctl(struct file *file_ptr, unsigned int command, unsigned lo
   // Handles all the control operations for the motor
   switch(command)
   {
+    case MOTOR_STOP:
+      motor_stop(file_ptr);
+      printk(KERN_INFO "Motor: Stoped\n");
 
+      break;
+    case MOTOR_ROTATE:
+      motor_rotate(file_ptr, arg);
+      printk(KERN_INFO "Motor: Started to rotate\n");
+
+      break;
+    case default:
+      printk(KERN_INFO "Motor: No command received\n");
+
+      return -ENOTTY;
   }
+
   return 0;
 }
 
