@@ -8,8 +8,6 @@
 #include <linux/ctype.h>
 #include <linux/mutex.h>
 #include <asm/io.h>
-#include <asm/div64.h>
-#include <linux/jiffies.h>
 #include <linux/types.h>
 
 #define DEVICE_NAME "MotorDevice"
