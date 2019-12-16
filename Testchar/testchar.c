@@ -25,34 +25,41 @@ MODULE_VERSION("1.0");
  */
 static DEFINE_MUTEX(testchar_mutex);
 
-static int   major_number;                  ///< Stores the device number -- determined automatically
-static char  message[256] = {0};            ///< Memory for the string that is passed from userspace
-static short size_of_message;               ///< Used to remember the size of the string stored
-static int   number_of_opens = 0;           ///< Counts the number of times the device is opened
-static int   device_mode = TESTCHAR_NONE;
+static int major_number;                  ///< Stores the device number -- determined automatically
+static char message[256] = {0};           ///< Memory for the string that is passed from userspace
+static short size_of_message;             ///< Used to remember the size of the string stored
+static int number_of_opens = 0;           ///< Counts the number of times the device is opened
+static int device_mode = TESTCHAR_NONE;
 
-static struct class  *testchar_class = NULL;   ///< The device-driver class struct pointer
+static struct class *testchar_class = NULL;   ///< The device-driver class struct pointer
 static struct device *testchar_device = NULL;  ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
-static int     dev_open(struct inode *, struct file *);
-static int     dev_release(struct inode *, struct file *);
+static int dev_open(struct inode *, struct file *);
+static int dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
-static long    dev_ioctl(struct file *, unsigned int, unsigned long);
+static long dev_ioctl(struct file *, unsigned int, unsigned long);
 
 /** @brief Devices are represented as file structure in the kernel. The file_operations structure 
  *  from /linux/fs.h lists the callback functions that you wish to associated with your file operations
  *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
  */
 static struct file_operations file_operations_t = {
-  .open =    dev_open,
-  .read =    dev_read,
-  .write =   dev_write,
+  .open = dev_open,
+  .read = dev_read,
+  .write = dev_write,
   .release = dev_release,
-  .unlocked_ioctl =   dev_ioctl
+  .unlocked_ioctl = dev_ioctl
 };
 
+/** @brief The LKM initialization function
+ *  The static keyword restricts the visibility of the function to within
+ *  this C file. The __init macro means that for a built-in driver (not a LKM)
+ *  the function is only used at initialization time and that it can be 
+ *  discarded and its memory freed up after that point.
+ *  @return returns 0 if successful
+ */
 static int __init testchar_init(void)
 {
   printk(KERN_INFO "TestChar: Initializing the TestChar LKM\n");
@@ -268,13 +275,17 @@ static long dev_ioctl(struct file *file_ptr, unsigned int command, unsigned long
   return 0;
 }
 
+/** @brief The LKM cleanup function
+ *  Similar to the initialization function, it is static. The __exit macro notifies that if this
+ *  code is used for a built-in driver (not a LKM) that this function is not required.
+ */
 static void __exit testchar_exit(void)
 {
   device_destroy(testchar_class, MKDEV(major_number, 0)); // remove the device
   class_unregister(testchar_class);                       // unregister the device class
   class_destroy(testchar_class);                          // remove the device class
   unregister_chrdev(major_number, DEVICE_NAME);           // unregister the major number
-  mutex_destroy(&testchar_mutex);                          // destroy the dynamically-allocated mutex
+  mutex_destroy(&testchar_mutex);                         // destroy the dynamically-allocated mutex
 
   printk(KERN_INFO "TestChar: Goodbye from the Device Driver!\n");
 }
