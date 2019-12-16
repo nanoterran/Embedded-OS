@@ -1,7 +1,7 @@
 #include "MorseCode.h"
 
 #define DEVICE_NAME "MorseCode"
-#define CLASS_NAME  "Morse"
+#define CLASS_NAME "Morse"
 
 MODULE_AUTHOR("Javier Vega");
 MODULE_LICENSE("GPL");
@@ -9,51 +9,51 @@ MODULE_DESCRIPTION("A Morse Code Driver support to blink USR0 LED.");
 MODULE_VERSION("1.0");
 
 
-static int           dev_open(struct inode *, struct file *);
-static int           dev_release(struct inode *, struct file *);
-static ssize_t       dev_read(struct file *, char *, size_t, loff_t *);
-static ssize_t       dev_write(struct file *, const char *, size_t, loff_t *);
-static long          dev_ioctl(struct file *, unsigned int, unsigned long);
+static int dev_open(struct inode *, struct file *);
+static int dev_release(struct inode *, struct file *);
+static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
+static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
+static long dev_ioctl(struct file *, unsigned int, unsigned long);
 
-static void          display_morse_code_message(unsigned long value);
-static void          display_morse_code_character(char character);
+static void display_morse_code_message(unsigned long value);
+static void display_morse_code_character(char character);
 static inline char * ascii_to_morsecode(int asciicode);
-static void          convert_message_to_morsecode(char *message, size_t size);
-static void          turn_on_led(void);
-static void          turn_off_led(void);
-static void          set_display_time(uint32_t milli_seconds);
-static void          set_timer_callback(void);
-static void          set_timer_data(unsigned long data);
-static uint8_t       done_displaying_message(void);
-static void          set_device_state(uint8_t state);
-static uint8_t       get_device_state(void);
+static void convert_message_to_morsecode(char *message, size_t size);
+static void turn_on_led(void);
+static void turn_off_led(void);
+static void set_display_time(uint32_t milli_seconds);
+static void set_timer_callback(void);
+static void set_timer_data(unsigned long data);
+static uint8_t done_displaying_message(void);
+static void set_device_state(uint8_t state);
+static uint8_t get_device_state(void);
 
 static morse_character_data * get_character_data(char character);
 
 static struct file_operations file_operations_t =
 {
-  .open           = dev_open,
-  .read           = dev_read,
-  .write          = dev_write,
-  .release        = dev_release,
+  .open = dev_open,
+  .read = dev_read,
+  .write = dev_write,
+  .release = dev_release,
   .unlocked_ioctl = dev_ioctl
 };
 
-static                          DEFINE_MUTEX(morse_mutex);
-static struct class            *morse_class = NULL;
-static struct device           *morse_device;
-static int                      major_number;
-static struct timer_list        timer;
+static DEFINE_MUTEX(morse_mutex);
+static struct class *morse_class = NULL;
+static struct device *morse_device;
+static int major_number;
+static struct timer_list timer;
 static struct morse_code_device morse;
-static uint8_t                  number_of_opens = 0;
+static uint8_t number_of_opens = 0;
 
 static const struct morse_character_data morse_character_table[] =
 {
-  { '.', DotTimeInMilliSec,                 turn_on_led },
-  { '-', DashTimeInMilliSec,                turn_on_led },
+  { '.', DotTimeInMilliSec, turn_on_led },
+  { '-', DashTimeInMilliSec, turn_on_led },
   { ' ', IntraCharacterSpaceTimeInMilliSec, turn_off_led },
   { '#', InterCharacterSpaceTimeInMilliSec, turn_off_led },
-  { '$', WordSpaceTimeInMilliSec,           turn_off_led }
+  { '$', WordSpaceTimeInMilliSec, turn_off_led }
 };
 
 
