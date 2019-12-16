@@ -75,7 +75,7 @@ static int __init morse_init(void)
 
     return major_number;
   }
-  printk(KERN_INFO "MorseCode: Registerd Correctrly %d\n", major_number);
+  printk(KERN_INFO "MorseCode: Registered Correctly %d\n", major_number);
 
   morse_class = class_create(THIS_MODULE, CLASS_NAME);
   if(IS_ERR(morse_class))
@@ -243,7 +243,7 @@ static void turn_on_led(void)
   gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
   set_data = (long)gpio1_address + GPIO1_DATAOUT_REGISTER_OFFSET;
 
-  *set_data = *set_data | USR0_LED;
+  *set_data = *set_data | USR3_LED;
 }
 
 static void turn_off_led(void)
@@ -254,7 +254,7 @@ static void turn_off_led(void)
   gpio1_address = ioremap(GPIO1_BASE_START_ADDRES, GPIO1_SIZE);
   clear_data = (long)gpio1_address + GPIO1_CLEAR_DATAOUT_REGISTER_OFFSET;
 
-  *clear_data = *clear_data | USR0_LED;
+  *clear_data = *clear_data | USR3_LED;
 }
 
 static void set_timer_callback()
@@ -350,8 +350,6 @@ static void display_morse_code_character(char character)
   set_timer_callback();
   set_display_time(character_data->millisec_time);
   add_timer(&timer);
-
-  printk(KERN_INFO "MorseCode: %c\n", character);
   
   character_data->display();
 }
