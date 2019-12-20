@@ -12,15 +12,7 @@ int main(int argc, char *argv[])
 	}
 
 	mcode_configuration_t *configuration = malloc(sizeof(configuration));
-
-	// Find the word on the argument options
-	for(int i = 0; i < argc; i++)
-	{
-		if(!strcmp(argv[i], "-w"))
-		{
-			configuration->raw_word = argv[i + 1];
-		}
-	}
+	configuration->raw_word = extract_word_from_arguments(argc, argv);
 
 	// Gets the architecture of the system
 	char architecture[10];

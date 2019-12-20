@@ -65,3 +65,15 @@ void display_word_in_morse_code(mcode_configuration_t *configuration)
 		usleep(BetweenLetterTimeInMicroSec);
 	}
 }
+
+char * extract_word_from_arguments(int arg_count, char *arg_values[])
+{
+	// Find the word on the argument options
+	for(int i = 0; i < arg_count; i++)
+	{
+		if(!strcmp(arg_values[i], "-w"))
+		{
+			return arg_values[i + 1];
+		}
+	}
+}

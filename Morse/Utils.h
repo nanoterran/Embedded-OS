@@ -23,5 +23,6 @@ typedef struct mcode_configuration_t
 } mcode_configuration_t;
 
 void display_word_in_morse_code(mcode_configuration_t *configuration);
+char * extract_word_from_arguments(int arg_count, char *arg_values[]);
 
 #endif
