@@ -5,7 +5,7 @@
  * on x86_64 it will print the Morse Code to the terminal, and
  * if running on the BeagleBone Black it will flash LED3
  */
-void process_word(mcode_configuration_t *configuration)
+void display_word_in_morse_code(mcode_configuration_t *configuration)
 {
 	FILE *file_descriptor = configuration->file_descriptor;
 	char *word = configuration->raw_word;
@@ -14,7 +14,7 @@ void process_word(mcode_configuration_t *configuration)
 	for(int i = 0; i < strlen(word); i++)
 	{
 		int ascii_code = (int)word[i];
-		char *mcode_letter = (char *)mcodestring(ascii_code);
+		char *mcode_letter = (char *)ascii_to_morse_code(ascii_code);
 
 		// Represents each character in Morse Code
 		for(int i = 0; i < strlen(mcode_letter); i++)

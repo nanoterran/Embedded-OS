@@ -9,10 +9,10 @@
 
 enum
 {
-  DotTimeInMicroSec               = 500000,
-  DashTimeInMicroSec              = 1500000,
-  BetweenCharacterTimeInMicroSec  = 250000,
-  BetweenLetterTimeInMicroSec     = 2000000
+  DotTimeInMicroSec = 500000,
+  DashTimeInMicroSec = 1500000,
+  BetweenCharacterTimeInMicroSec = 250000,
+  BetweenLetterTimeInMicroSec = 2000000
 };
 
 typedef struct mcode_configuration_t
@@ -22,6 +22,6 @@ typedef struct mcode_configuration_t
   char *raw_word;
 } mcode_configuration_t;
 
-void process_word(mcode_configuration_t *configuration);
+void display_word_in_morse_code(mcode_configuration_t *configuration);
 
 #endif

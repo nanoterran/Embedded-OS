@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 		configuration->file_descriptor = fopen(LEDBrightness, "r+");;
 	}
 
-	process_word(configuration);
+	display_word_in_morse_code(configuration);
 
 	fclose(configuration->file_descriptor);
 	free(configuration);
