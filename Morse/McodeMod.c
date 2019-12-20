@@ -1,17 +1,17 @@
 #define CQ_DEFAULT	0
 #include "McodeMod.h"
 
-/* the empty string, follwed by 26 letter codes, followed by the 10 numeral codes, followed by the comma,
-   period, and question mark.  */
-
+/** the empty string, follwed by 26 letter codes, followed by the 10 numeral codes, followed by the comma,
+ *  period, and question mark.
+ */
 char *morse_code[40] = {"",
 ".-","-...","-.-.","-..",".","..-.","--.","....","..",".---","-.-",
 ".-..","--","-.","---",".--.","--.-",".-.","...","-","..-","...-",
 ".--","-..-","-.--","--..","-----",".----","..---","...--","....-",
 ".....","-....","--...","---..","----.","--..--","-.-.-.","..--.."};
 
-inline char * mcodestring(int asciicode)
-{
+inline char * ascii_to_morse_code(int asciicode)
+{ 
    char *mc;   // this is the mapping from the ASCII code into the mcodearray of strings.
 
    if (asciicode > 122)  // Past 'z'
