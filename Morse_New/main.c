@@ -20,6 +20,7 @@ char * extract_word_from_arguments(int arg_count, char *arg_values[])
 			return arg_values[i + 1];
 		}
 	}
+	return NULL;
 }
 
 /*
