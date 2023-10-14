@@ -4,13 +4,11 @@
 #include <unistd.h>
 #include "McodeMod.h"
 
-enum
-{
-  DotTimeInMicroSec = 500000,
-  DashTimeInMicroSec = 1500000,
-  BetweenCharacterTimeInMicroSec = 250000,
-  BetweenLetterTimeInMicroSec = 2000000
-};
+#define DotTimeInMicroSec 500000
+#define DashTimeInMicroSec 1500000
+#define BetweenCharacterTimeInMicroSec 250000
+#define BetweenLetterTimeInMicroSec 2000000
+
 
 char * extract_word_from_arguments(int arg_count, char *arg_values[])
 {
